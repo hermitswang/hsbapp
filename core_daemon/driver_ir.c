@@ -11,6 +11,7 @@
 #include "device.h"
 #include "hsb_error.h"
 #include "hsb_config.h"
+#include "channel.h"
 
 static HSB_DEV_DRV_T ir_drv;
 static HSB_DEV_OP_T cc9201_op;
@@ -19,35 +20,6 @@ static HSB_DEV_DRV_OP_T ir_drv_op;
 typedef struct {
 	// TODO: channel mapping
 } CC9201_DATA_T;
-
-typedef enum {
-	HSB_TV_STATUS_CHANNEL = 0,
-	HSB_TV_STATUS_LAST,
-} HSB_TV_STATUS_T;
-
-typedef enum {
-	HSB_TV_ACTION_ON_OFF = 0,
-	HSB_TV_ACTION_ADD_VOL,
-	HSB_TV_ACTION_DEC_VOL,
-	HSB_TV_ACTION_OK,
-	HSB_TV_ACTION_BACK,
-	HSB_TV_ACTION_LEFT,
-	HSB_TV_ACTION_RIGHT,
-	HSB_TV_ACTION_UP,
-	HSB_TV_ACTION_DOWN,
-	HSB_TV_ACTION_MUTE,
-	HSB_TV_ACTION_KEY_0,
-	HSB_TV_ACTION_KEY_1,
-	HSB_TV_ACTION_KEY_2,
-	HSB_TV_ACTION_KEY_3,
-	HSB_TV_ACTION_KEY_4,
-	HSB_TV_ACTION_KEY_5,
-	HSB_TV_ACTION_KEY_6,
-	HSB_TV_ACTION_KEY_7,
-	HSB_TV_ACTION_KEY_8,
-	HSB_TV_ACTION_KEY_9,
-	HSB_TV_ACTION_LAST,
-} HSB_TV_ACTION_T;
 
 static uint8_t cc9201_key_map[HSB_TV_ACTION_LAST] = {
 	0x1,	// TODO
@@ -87,13 +59,24 @@ static int cc9201_key_press(HSB_DEV_T *ir_dev, HSB_TV_ACTION_T action)
 	return set_action(ir_dev, &act);
 }
 
+
 static int cc9201_init(void **priv)
 {
+	HSB_CHANNEL_DB_T *pdb = g_slice_new0(HSB_CHANNEL_DB_T);
+	if (!pdb)
+		return HSB_E_NO_MEMORY;
+	
+	init_channel(pdb);
+
+	*priv = pdb;
+
 	return HSB_E_OK;
 }
 
 static int cc9201_release(void *priv)
 {
+	g_slice_free(HSB_CHANNEL_DB_T, priv);
+
 	return HSB_E_OK;
 }
 
@@ -167,17 +150,24 @@ static int cc9201_set_action(const HSB_ACTION_T *act)
 	return cc9201_key_press(irdev, act->param1);
 }
 
+static int cc9201_get_channel_db(HSB_DEV_T *pdev, HSB_CHANNEL_DB_T **pdb)
+{
+	*pdb = (HSB_CHANNEL_DB_T *)pdev->priv_data;
+
+	return HSB_E_OK;
+}
+
 static int ir_add_dev(HSB_IR_DEV_TYPE_T ir_type)
 {
 	uint32_t devid;
 	HSB_DEV_INFO_T dev_info = { 0 };
-	dev_info.cls = HSB_DEV_CLASS_STB;
 	dev_info.interface = HSB_INTERFACE_IR;
 
 	HSB_DEV_OP_T *op = NULL;
 	// ir_type to dev op
 	switch (ir_type) {
 		case HSB_IR_DEV_TYPE_CC9201:
+			dev_info.cls = HSB_DEV_CLASS_STB;
 			op = &cc9201_op;
 			break;
 		default:
@@ -208,6 +198,7 @@ static HSB_DEV_OP_T cc9201_op = {
 	cc9201_set_action,
 	cc9201_init,
 	cc9201_release,
+	cc9201_get_channel_db,
 };
 
 static HSB_DEV_DRV_OP_T ir_drv_op = {
@@ -217,7 +208,7 @@ static HSB_DEV_DRV_OP_T ir_drv_op = {
 
 static HSB_DEV_DRV_T ir_drv = {
 	"cg ir",
-	3,
+	HSB_DRV_ID_IR,
 	&ir_drv_op,
 };
 

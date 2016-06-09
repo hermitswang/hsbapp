@@ -348,7 +348,7 @@ static HSB_DEV_DRV_OP_T virtual_switch_drv_op = {
 
 static HSB_DEV_DRV_T virtual_switch_drv = {
 	"virtual switch",
-	1,
+	HSB_DRV_ID_CJ_WIFI,
 	&virtual_switch_drv_op,
 };
 

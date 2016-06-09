@@ -22,6 +22,8 @@
 
 #define CHECK_BIT(a, b)		(a & (1 << b))
 
+#define HSB_CHANNEL_MAX_NAME_LEN	(16)
+
 typedef struct {
 	char *pid_file ;
 	char *unix_listen_path;	

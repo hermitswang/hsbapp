@@ -8,6 +8,7 @@
 #include "net_protocol.h"
 #include "hsb_device.h"
 #include "hsb_error.h"
+#include "channel.h"
 
 typedef struct {
 	uint32_t	devid;
@@ -80,11 +81,12 @@ typedef struct {
 	int (*set_action)(const HSB_ACTION_T *act);
 	int (*init)(void **priv);
 	int (*release)(void *priv);
+	int (*get_channel_db)(struct _HSB_DEV_T *pdev, HSB_CHANNEL_DB_T **pdb);
 } HSB_DEV_OP_T;
 
 typedef struct {
 	int (*probe)(void);
-	int (*add_dev)(HSB_IR_DEV_TYPE_T ir_type);
+	int (*add_dev)(HSB_IR_DEV_TYPE_T dev_type);
 } HSB_DEV_DRV_OP_T;
 
 typedef struct _HSB_DEV_DRV_T {
@@ -151,6 +153,8 @@ typedef struct {
 #define HSB_DEV_MAX_TIMER_NUM		(32)
 #define HSB_DEV_MAX_DELAY_NUM		(8)
 #define HSB_DEV_MAX_LINKAGE_NUM		(8)
+#define HSB_DEV_MAX_NAME_LEN		(16)
+#define HSB_DEV_MAX_LOCATION_LEN	(16)
 
 typedef struct {
 	HSB_DEV_CLASS_T		cls;
@@ -159,12 +163,20 @@ typedef struct {
 } HSB_DEV_INFO_T;
 
 typedef struct {
-	char			name[32];
-	char			location[32];
+	char			name[HSB_DEV_MAX_NAME_LEN];
+	char			location[HSB_DEV_MAX_LOCATION_LEN];
 } HSB_DEV_CONFIG_T;
+
+typedef enum {
+	HSB_DEV_STATE_UNINIT = 0,
+	HSB_DEV_STATE_ONLINE,
+	HSB_DEV_STATE_OFFLINE,
+} HSB_DEV_STATE_T;
 
 typedef struct _HSB_DEV_T {
 	uint32_t		id;
+
+	uint32_t		state;
 
 	uint32_t		status[8];
 	int			status_num;
@@ -199,10 +211,10 @@ typedef struct _HSB_DEV_T {
 
 int init_dev_module(void);
 int get_dev_id_list(uint32_t *dev_id, int *dev_num);
-int get_dev_info(uint32_t dev_id, HSB_DEV_T *dev);
+int get_dev_info(uint32_t dev_id, HSB_DEV_T *pdev);
 HSB_DEV_T *find_dev(uint32_t dev_id);
-int get_dev_config(uint32_t dev_id, HSB_DEV_CONFIG_T *config);
-int set_dev_config(uint32_t dev_id, const HSB_DEV_CONFIG_T *config);
+int get_dev_cfg(uint32_t dev_id, HSB_DEV_CONFIG_T *cfg);
+int set_dev_cfg(uint32_t dev_id, const HSB_DEV_CONFIG_T *cfg);
 
 
 int get_status(HSB_DEV_T *pdev, HSB_STATUS_T *status);
@@ -212,6 +224,7 @@ int set_action(HSB_DEV_T *pdev, const HSB_ACTION_T *act);
 int get_dev_status_async(uint32_t devid, void *reply);
 int set_dev_status_async(const HSB_STATUS_T *status, void *reply);
 int probe_dev_async(const HSB_PROBE_T *probe, void *reply);
+int add_dev(uint32_t drv_id, HSB_IR_DEV_TYPE_T ir_type);
 int set_dev_action_async(const HSB_ACTION_T *act, void *reply);
 
 int get_dev_timer(uint32_t dev_id, uint16_t timer_id, HSB_TIMER_T *timer);
@@ -246,6 +259,17 @@ int register_dev_drv(HSB_DEV_DRV_T *drv);
 int init_virtual_switch_drv(void);
 
 int check_timer_and_delay(void);
+
+int set_dev_channel(uint32_t devid, char *name, uint32_t cid);
+int del_dev_channel(uint32_t devid, char *name);
+int get_dev_channel(uint32_t devid, char *name, uint32_t *cid);
+
+typedef enum {
+	HSB_IR_PROTOCOL_TYPE_CC9201 = 0,
+	HSB_IR_PROTOCOL_TYPE_NEC,
+	HSB_IR_PROTOCOL_TYPE_GREE,
+	HSB_IR_PROTOCOL_TYPE_LAST,
+} HSB_IR_PROTOCOL_TYPE_T;
 
 #endif
 

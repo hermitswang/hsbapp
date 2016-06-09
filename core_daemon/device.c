@@ -84,31 +84,167 @@ HSB_DEV_T *find_dev(uint32_t dev_id)
 	return NULL;
 }
 
-int get_dev_config(uint32_t dev_id, HSB_DEV_CONFIG_T *config)
+static int link_device(HSB_DEV_T *pdev)
+{
+	if (pdev->driver->id != 3)
+		return HSB_E_OK;
+
+	guint len, id;
+	GQueue *queue = &gl_dev_cb.queue;
+	HSB_DEV_T	*pdevice = NULL;
+
+	len = g_queue_get_length(queue);
+	for (id = 0; id < len; id++) {
+		pdevice = (HSB_DEV_T *)g_queue_peek_nth(queue, id);
+		if (!pdevice) {
+			hsb_critical("device null\n");
+			continue;
+		}
+
+		if (pdev == pdevice)
+			continue;
+
+		if (0 < strlen(pdev->config.location) &&
+		    0 < strlen(pdevice->config.location) &&
+		    0 == strncmp(pdevice->config.location,
+				 pdev->config.location,
+				 sizeof(pdev->config.location)) &&
+		    pdevice->info.cls == HSB_DEV_CLASS_REMOTE_CONTROL)
+		{
+			pdev->ir_dev = pdevice;
+			break;
+		}
+	}
+
+	if (id == len)
+		pdev->ir_dev = NULL;
+
+	return HSB_E_OK;
+}
+
+static int update_link(HSB_DEV_T *pdev)
+{
+	if (pdev->info.cls != HSB_DEV_CLASS_REMOTE_CONTROL)
+		return HSB_E_OK;
+
+	bool online = (pdev->state == HSB_DEV_STATE_ONLINE) ? true : false;
+
+	guint len, id;
+	GQueue *queue = &gl_dev_cb.queue;
+	HSB_DEV_T	*pdevice = NULL;
+
+	len = g_queue_get_length(queue);
+	for (id = 0; id < len; id++) {
+		pdevice = (HSB_DEV_T *)g_queue_peek_nth(queue, id);
+		if (!pdevice) {
+			hsb_critical("device null\n");
+			continue;
+		}
+
+		if (pdev == pdevice)
+			continue;
+
+		if (!online) {
+			if (pdevice->ir_dev == pdev) {
+				pdevice->ir_dev = NULL;
+				link_device(pdevice);
+			}
+		} else {
+			if (0 < strlen(pdev->config.location) &&
+			    0 < strlen(pdevice->config.location) &&
+			    0 == strncmp(pdevice->config.location,
+				 pdev->config.location,
+				 sizeof(pdev->config.location)))
+			{
+				pdevice->ir_dev = pdev;
+			}
+		}
+	}
+
+	return HSB_E_OK;
+}
+
+int get_dev_cfg(uint32_t dev_id, HSB_DEV_CONFIG_T *cfg)
 {
 	HSB_DEV_T *pdev = find_dev(dev_id);
 
 	if (!pdev)
 		return HSB_E_BAD_PARAM;
 
-	memcpy(config, &pdev->config, sizeof(*config));
+	memcpy(cfg, &pdev->config, sizeof(*cfg));
 
 	return HSB_E_OK;
 }
 
-int set_dev_config(uint32_t dev_id, const HSB_DEV_CONFIG_T *config)
+int set_dev_cfg(uint32_t dev_id, const HSB_DEV_CONFIG_T *cfg)
 {
 	HSB_DEV_T *pdev = find_dev(dev_id);
 
 	if (!pdev)
 		return HSB_E_BAD_PARAM;
 
-	memcpy(&pdev->config, config, sizeof(*config));
+	memcpy(&pdev->config, cfg, sizeof(*cfg));
 
-	// TODO: link device
+	link_device(pdev);
+	update_link(pdev);
 
 	return HSB_E_OK;
 }
+
+int set_dev_channel(uint32_t devid, char *name, uint32_t cid)
+{
+	HSB_DEV_T *pdev = find_dev(devid);
+
+	if (!pdev)
+		return HSB_E_BAD_PARAM;
+
+	HSB_CHANNEL_DB_T *pdb = NULL;
+
+	if (pdev->op && pdev->op->get_channel_db)
+		pdev->op->get_channel_db(pdev, &pdb);
+
+	if (!pdb)
+		return HSB_E_NOT_SUPPORTED;
+
+	return set_channel(pdb, name, cid);
+}
+
+int del_dev_channel(uint32_t devid, char *name)
+{
+	HSB_DEV_T *pdev = find_dev(devid);
+
+	if (!pdev)
+		return HSB_E_BAD_PARAM;
+
+	HSB_CHANNEL_DB_T *pdb = NULL;
+
+	if (pdev->op && pdev->op->get_channel_db)
+		pdev->op->get_channel_db(pdev, &pdb);
+
+	if (!pdb)
+		return HSB_E_NOT_SUPPORTED;
+
+	return del_channel(pdb, name);
+}
+
+int get_dev_channel(uint32_t devid, char *name, uint32_t *cid)
+{
+	HSB_DEV_T *pdev = find_dev(devid);
+
+	if (!pdev)
+		return HSB_E_BAD_PARAM;
+
+	HSB_CHANNEL_DB_T *pdb = NULL;
+
+	if (pdev->op && pdev->op->get_channel_db)
+		pdev->op->get_channel_db(pdev, &pdb);
+
+	if (!pdb)
+		return HSB_E_NOT_SUPPORTED;
+
+	return get_channel(pdb, name, cid);
+}
+
 
 static HSB_DEV_DRV_T *_get_dev_drv(uint32_t devid)
 {
@@ -141,7 +277,7 @@ int get_dev_info(uint32_t dev_id, HSB_DEV_T *dev)
 
 	pdev = find_dev(dev_id);
 	if (pdev) {
-		memcpy(dev, pdev, sizeof(*pdev));
+		memcpy(dev, pdev, sizeof(*dev));
 	} else {
 		ret = -1;
 	}
@@ -150,6 +286,7 @@ int get_dev_info(uint32_t dev_id, HSB_DEV_T *dev)
 
 	return ret;
 }
+
 
 int get_dev_status(HSB_STATUS_T *status)
 {
@@ -263,6 +400,19 @@ int probe_dev(uint32_t drv_id)
 		return pdrv->op->probe();
 
 	return HSB_E_OK;
+}
+
+int add_dev(uint32_t drv_id, HSB_IR_DEV_TYPE_T dev_type)
+{
+	HSB_DEV_DRV_T *pdrv = _find_drv(drv_id);
+
+	if (!pdrv)
+		return HSB_E_BAD_PARAM;
+
+	if (pdrv->op && pdrv->op->add_dev)
+		return pdrv->op->add_dev(dev_type);
+
+	return HSB_E_NOT_SUPPORTED;
 }
 
 static uint32_t alloc_dev_id(void)
@@ -410,6 +560,7 @@ int dev_online(uint32_t drvid, HSB_DEV_INFO_T *info, uint32_t *devid, HSB_DEV_OP
 		pdev->driver = _find_drv(drvid);
 		pdev->op = op;
 		pdev->priv_data = priv;
+		pdev->state = HSB_DEV_STATE_ONLINE;
 
 		memcpy(&pdev->info, info, sizeof(*info));
 
@@ -422,8 +573,11 @@ int dev_online(uint32_t drvid, HSB_DEV_INFO_T *info, uint32_t *devid, HSB_DEV_OP
 		g_queue_pop_nth(offq, id);
 
 		HSB_DEVICE_CB_LOCK();
+		pdev->state = HSB_DEV_STATE_ONLINE;
 		g_queue_push_tail(queue, pdev);
 		HSB_DEVICE_CB_UNLOCK();
+
+		update_link(pdev);
 
 		dev_updated(pdev->id, HSB_DEV_UPDATED_TYPE_ONLINE);
 	}
@@ -461,11 +615,15 @@ int dev_offline(uint32_t devid)
 		return HSB_E_OTHERS;
 	}
 
+	pdev->state = HSB_DEV_STATE_OFFLINE;
+
 	g_queue_pop_nth(queue, id);
 
 	g_queue_push_tail(offq, pdev);
 
 	HSB_DEVICE_CB_UNLOCK();
+
+	update_link(pdev);
 
 	dev_updated(devid, HSB_DEV_UPDATED_TYPE_OFFLINE);
 
@@ -596,7 +754,8 @@ static void probe_all_devices(void)
 
 	for (id = 0; id < len; id++) {
 		drv = g_queue_peek_nth(queue, id);
-		drv->op->probe();
+		if (drv->op && drv->op->probe)
+			drv->op->probe();
 	}
 }
 
@@ -810,7 +969,8 @@ int init_dev_module(void)
 	init_private_thread();
 
 	init_virtual_switch_drv();
-	//init_cz_drv();
+	init_cz_drv();
+	init_ir_drv();
 
 	probe_all_devices();
 

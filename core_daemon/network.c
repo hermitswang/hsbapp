@@ -81,6 +81,17 @@ static int _reply_get_device_info(uint8_t *buf, HSB_DEV_T *dev)
 	return len;
 }
 
+static int _reply_get_device_cfg(uint8_t *buf, uint32_t dev_id, HSB_DEV_CONFIG_T *cfg)
+{
+	int len = 8 + sizeof(cfg->name) + sizeof(cfg->location);
+
+	MAKE_CMD_HDR(buf, HSB_CMD_GET_CONFIG_RESP, len);
+	SET_CMD_FIELD(buf, 4, uint32_t, dev_id); /* device id */
+	memcpy(buf + 8, cfg, sizeof(*cfg));
+
+	return len;
+}
+
 /*
 static int _reply_get_device_status(uint8_t *buf, uint32_t dev_id, HSB_STATUS_T *status, int num)
 {
@@ -271,6 +282,31 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 
 			break;
 		}
+		case HSB_CMD_GET_CONFIG:
+		{
+			HSB_DEV_CONFIG_T cfg;
+			uint32_t dev_id = GET_CMD_FIELD(buf, 4, uint32_t);
+			ret = get_dev_cfg(dev_id, &cfg);
+			if (HSB_E_OK != ret)
+				rlen = _reply_result(reply_buf, ret);
+			else
+				rlen = _reply_get_device_cfg(reply_buf, dev_id, &cfg);
+
+			break;
+		}
+		case HSB_CMD_SET_CONFIG:
+		{
+			HSB_DEV_CONFIG_T cfg;
+			uint32_t dev_id = GET_CMD_FIELD(buf, 4, uint32_t);
+
+			memcpy(&cfg, buf + 8, sizeof(cfg));
+
+			ret = set_dev_cfg(dev_id, &cfg);
+
+			rlen = _reply_result(reply_buf, ret);
+
+			break;
+		}
 		case HSB_CMD_GET_STATUS:
 		{
 			uint32_t dev_id = GET_CMD_FIELD(buf, 4, uint32_t);
@@ -289,6 +325,62 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			status.devid = dev_id;
 
 			_get_dev_status(buf, len, &status);
+
+			ret = set_dev_status_async(&status, reply);
+
+			rlen = 0;
+
+			break;
+		}
+		case HSB_CMD_SET_CHANNEL:
+		{
+			char name[HSB_CHANNEL_MAX_NAME_LEN];
+			uint32_t cid, devid;
+
+			devid = GET_CMD_FIELD(buf, 4, uint32_t);
+			strncpy(name, buf + 8, sizeof(name));
+			cid = GET_CMD_FIELD(buf, 8 + sizeof(name), uint32_t);
+
+			ret = set_dev_channel(devid, name, cid);
+
+			rlen = _reply_result(reply_buf, ret);
+
+			break;
+		}
+		case HSB_CMD_DEL_CHANNEL:
+		{
+			char name[HSB_CHANNEL_MAX_NAME_LEN];
+			uint32_t devid;
+
+			devid = GET_CMD_FIELD(buf, 4, uint32_t);
+			strncpy(name, buf + 8, sizeof(name));
+
+			ret = del_dev_channel(devid, name);
+
+			rlen = _reply_result(reply_buf, ret);
+
+			break;
+		}
+		case HSB_CMD_SWITCH_CHANNEL:
+		{
+			char name[HSB_CHANNEL_MAX_NAME_LEN];
+			uint32_t devid, cid;
+			HSB_STATUS_T status = { 0 };
+
+			devid = GET_CMD_FIELD(buf, 4, uint32_t);
+			strncpy(name, buf + 8, sizeof(name));
+
+			ret = get_dev_channel(devid, name, &cid);
+			
+			if (HSB_E_OK != ret) {
+				rlen = _reply_result(reply_buf, ret);
+				break;
+			}
+
+			status.devid = devid;
+			status.num = 1;
+			status.id[0] = HSB_TV_STATUS_CHANNEL;
+			status.val[0] = cid;
 
 			ret = set_dev_status_async(&status, reply);
 
@@ -464,16 +556,29 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 		}
 		case HSB_CMD_PROBE_DEV:
 		{
-			uint16_t type = GET_CMD_FIELD(buf, 4, uint16_t);
+			uint16_t drvid = GET_CMD_FIELD(buf, 4, uint16_t);
 			HSB_PROBE_T probe;
 
-			probe.drvid = type;
+			probe.drvid = drvid;
 
 			hsb_debug("probe\n");
 
 			ret = probe_dev_async(&probe, reply);
 
 			rlen = 0;
+
+			break;
+		}
+		case HSB_CMD_ADD_DEV:
+		{
+			uint16_t drvid = GET_CMD_FIELD(buf, 4, uint16_t);
+			uint16_t dev_type = GET_CMD_FIELD(buf, 6, uint16_t);
+
+			hsb_debug("add_dev: %d,%d\n", drvid, dev_type);
+
+			ret = add_dev(drvid, dev_type);
+
+			rlen = _reply_result(reply_buf, ret);
 
 			break;
 		}

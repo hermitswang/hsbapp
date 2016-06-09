@@ -486,7 +486,7 @@ static HSB_DEV_DRV_OP_T cz_drv_op = {
 
 static HSB_DEV_DRV_T cz_drv = {
 	"cg zigbee",
-	2,
+	HSB_DRV_ID_CJ_ZIGBEE,
 	&cz_drv_op,
 };
 

@@ -47,6 +47,16 @@ static int deal_tcp_pkt(int fd, void *buf, size_t count)
 				dev_id, drvid, dev_class, interface, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 			break;
 		}
+		case HSB_CMD_GET_CONFIG_RESP:
+		{
+			char name[16], location[16];
+			dev_id = GET_CMD_FIELD(buf, 4, uint32_t);
+			strncpy(name, buf + 8, sizeof(name));
+			strncpy(location, buf + 24, sizeof(location));
+
+			printf("dev config: name=%s location=%s\n", name, location);
+			break;
+		}
 		case HSB_CMD_GET_STATUS_RESP:
 		{
 			dev_id = GET_CMD_FIELD(buf, 4, uint32_t);
@@ -153,7 +163,7 @@ static int deal_tcp_pkt(int fd, void *buf, size_t count)
 
 static int deal_input_cmd(int fd, void *buf, size_t count)
 {
-	uint8_t rbuf[16];
+	uint8_t rbuf[128];
 	int len;
 	uint32_t dev_id;
 	uint16_t status;
@@ -167,8 +177,12 @@ static int deal_input_cmd(int fd, void *buf, size_t count)
 	uint16_t act_param;
 	int val1, val2, val3;
 	uint32_t val4;
+	char name[16];
+	char location[16];
 
 	memset(rbuf, 0, sizeof(rbuf));
+	memset(name, 0, sizeof(name));
+	memset(location, 0, sizeof(location));
 
 	if (!strncmp(buf, "get devices", 11)) {
 		len = 4;
@@ -222,6 +236,43 @@ static int deal_input_cmd(int fd, void *buf, size_t count)
 		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_PROBE_DEV);
 		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
 		SET_CMD_FIELD(rbuf, 4, uint16_t, val1);
+	} else if (1 == sscanf(buf, "adddev %d", &val1)) {
+		len = 8;
+		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_ADD_DEV);
+		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
+		SET_CMD_FIELD(rbuf, 4, uint16_t, 3);
+		SET_CMD_FIELD(rbuf, 6, uint16_t, val1);
+	} else if (3 == sscanf(buf, "set config %d %s %s", &val1, name, location)) {
+		len = 40;
+		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_SET_CONFIG);
+		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
+		SET_CMD_FIELD(rbuf, 4, uint32_t, val1);
+		strncpy(rbuf + 8, name, sizeof(name));
+		strncpy(rbuf + 24, location, sizeof(location));
+	} else if (1 == sscanf(buf, "get config %d", &val1)) {
+		len = 8;
+		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_GET_CONFIG);
+		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
+		SET_CMD_FIELD(rbuf, 4, uint32_t, val1);
+	} else if (3 == sscanf(buf, "set channel %d %s %d", &val1, name, &val2)) {
+		len = 12 + sizeof(name);
+		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_SET_CHANNEL);
+		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
+		SET_CMD_FIELD(rbuf, 4, uint32_t, val1);
+		strncpy(rbuf + 8, name, sizeof(name));
+		SET_CMD_FIELD(rbuf, 8 + sizeof(name), uint32_t, val2); 
+	} else if (2 == sscanf(buf, "del channel %d %s", &val1, name)) {
+		len = 8 + sizeof(name);
+		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_DEL_CHANNEL);
+		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
+		SET_CMD_FIELD(rbuf, 4, uint32_t, val1);
+		strncpy(rbuf + 8, name, sizeof(name));
+	} else if (2 == sscanf(buf, "switch channel %d %s", &val1, name)) {
+		len = 8 + sizeof(name);
+		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_SWITCH_CHANNEL);
+		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
+		SET_CMD_FIELD(rbuf, 4, uint32_t, val1);
+		strncpy(rbuf + 8, name, sizeof(name));
 	} else if (4 == sscanf(buf, "action %d %d %d %x", &val1, &val2, &val3, &val4)) {
 		len = 16;
 		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_DO_ACTION);
