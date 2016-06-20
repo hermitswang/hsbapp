@@ -823,6 +823,8 @@ static void *tcp_listen_thread(void *arg)
 		}
 
 		g_thread_pool_push(client_pool.pool, (gpointer)pctx, NULL);
+
+		report_all_device();
 	}
 
 	hsb_critical("tcp listen thread closed\n");

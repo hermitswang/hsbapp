@@ -157,7 +157,7 @@ static int cc9201_get_channel_db(HSB_DEV_T *pdev, HSB_CHANNEL_DB_T **pdb)
 	return HSB_E_OK;
 }
 
-static int ir_add_dev(HSB_IR_DEV_TYPE_T ir_type)
+static int ir_add_dev(HSB_DEV_TYPE_T ir_type)
 {
 	uint32_t devid;
 	HSB_DEV_INFO_T dev_info = { 0 };
@@ -166,7 +166,7 @@ static int ir_add_dev(HSB_IR_DEV_TYPE_T ir_type)
 	HSB_DEV_OP_T *op = NULL;
 	// ir_type to dev op
 	switch (ir_type) {
-		case HSB_IR_DEV_TYPE_CC9201:
+		case HSB_DEV_TYPE_CC9201:
 			dev_info.cls = HSB_DEV_CLASS_STB;
 			op = &cc9201_op;
 			break;

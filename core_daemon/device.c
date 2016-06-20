@@ -84,6 +84,31 @@ HSB_DEV_T *find_dev(uint32_t dev_id)
 	return NULL;
 }
 
+int report_all_device(void)
+{
+	guint len, id;
+	GQueue *queue = &gl_dev_cb.queue;
+	HSB_DEV_T	*pdev;
+
+	HSB_DEVICE_CB_LOCK();
+
+	len = g_queue_get_length(queue);
+	for (id = 0; id < len; id++) {
+		pdev = (HSB_DEV_T *)g_queue_peek_nth(queue, id);
+		if (!pdev) {
+			hsb_critical("device null\n");
+			break;
+		}
+
+		dev_updated(pdev->id, HSB_DEV_UPDATED_TYPE_ONLINE, pdev->info.dev_type);
+	}
+
+	HSB_DEVICE_CB_UNLOCK();
+
+	return 0;
+}
+
+
 static int link_device(HSB_DEV_T *pdev)
 {
 	if (pdev->driver->id != 3)
@@ -402,7 +427,7 @@ int probe_dev(uint32_t drv_id)
 	return HSB_E_OK;
 }
 
-int add_dev(uint32_t drv_id, HSB_IR_DEV_TYPE_T dev_type)
+int add_dev(uint32_t drv_id, HSB_DEV_TYPE_T dev_type)
 {
 	HSB_DEV_DRV_T *pdrv = _find_drv(drv_id);
 
@@ -511,7 +536,7 @@ int register_dev(HSB_DEV_T *dev)
 
 	HSB_DEVICE_CB_UNLOCK();
 
-	dev_updated(dev->id, HSB_DEV_UPDATED_TYPE_NEW_ADD);
+	dev_updated(dev->id, HSB_DEV_UPDATED_TYPE_NEW_ADD, dev->info.dev_type);
 
 	return 0;
 }
@@ -524,7 +549,7 @@ int remove_dev(HSB_DEV_T *dev)
 	g_queue_remove(queue, dev);
 	HSB_DEVICE_CB_UNLOCK();
 
-	dev_updated(dev->id, HSB_DEV_UPDATED_TYPE_OFFLINE);
+	dev_updated(dev->id, HSB_DEV_UPDATED_TYPE_OFFLINE, dev->info.dev_type);
 
 	return 0;
 }
@@ -568,7 +593,7 @@ int dev_online(uint32_t drvid, HSB_DEV_INFO_T *info, uint32_t *devid, HSB_DEV_OP
 		g_queue_push_tail(queue, pdev);
 		HSB_DEVICE_CB_UNLOCK();
 
-		dev_updated(pdev->id, HSB_DEV_UPDATED_TYPE_NEW_ADD);
+		dev_updated(pdev->id, HSB_DEV_UPDATED_TYPE_NEW_ADD, pdev->info.dev_type);
 	} else {
 		g_queue_pop_nth(offq, id);
 
@@ -579,7 +604,7 @@ int dev_online(uint32_t drvid, HSB_DEV_INFO_T *info, uint32_t *devid, HSB_DEV_OP
 
 		update_link(pdev);
 
-		dev_updated(pdev->id, HSB_DEV_UPDATED_TYPE_ONLINE);
+		dev_updated(pdev->id, HSB_DEV_UPDATED_TYPE_ONLINE, pdev->info.dev_type);
 	}
 
 	*devid = pdev->id;
@@ -625,7 +650,7 @@ int dev_offline(uint32_t devid)
 
 	update_link(pdev);
 
-	dev_updated(devid, HSB_DEV_UPDATED_TYPE_OFFLINE);
+	dev_updated(devid, HSB_DEV_UPDATED_TYPE_OFFLINE, pdev->info.dev_type);
 
 	return ret;
 }
@@ -703,9 +728,9 @@ int dev_status_updated(uint32_t devid, HSB_STATUS_T *status)
 	return _dev_event(devid, HSB_EVT_TYPE_STATUS_UPDATED, status->id[0], status->val[0]);
 }
 
-int dev_updated(uint32_t devid, HSB_DEV_UPDATED_TYPE_T type)
+int dev_updated(uint32_t devid, HSB_DEV_UPDATED_TYPE_T type, HSB_DEV_TYPE_T dev_type)
 {
-	return _dev_event(devid, HSB_EVT_TYPE_DEV_UPDATED, type, 0);
+	return _dev_event(devid, HSB_EVT_TYPE_DEV_UPDATED, type, dev_type);
 }
 
 int dev_sensor_triggered(uint32_t devid, HSB_SENSOR_TYPE_T type)

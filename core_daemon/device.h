@@ -86,7 +86,7 @@ typedef struct {
 
 typedef struct {
 	int (*probe)(void);
-	int (*add_dev)(HSB_IR_DEV_TYPE_T dev_type);
+	int (*add_dev)(HSB_DEV_TYPE_T dev_type);
 } HSB_DEV_DRV_OP_T;
 
 typedef struct _HSB_DEV_DRV_T {
@@ -159,6 +159,7 @@ typedef struct {
 typedef struct {
 	HSB_DEV_CLASS_T		cls;
 	uint32_t		interface;
+	uint32_t		dev_type;
 	uint8_t			mac[8];
 } HSB_DEV_INFO_T;
 
@@ -224,7 +225,7 @@ int set_action(HSB_DEV_T *pdev, const HSB_ACTION_T *act);
 int get_dev_status_async(uint32_t devid, void *reply);
 int set_dev_status_async(const HSB_STATUS_T *status, void *reply);
 int probe_dev_async(const HSB_PROBE_T *probe, void *reply);
-int add_dev(uint32_t drv_id, HSB_IR_DEV_TYPE_T ir_type);
+int add_dev(uint32_t drv_id, HSB_DEV_TYPE_T dev_type);
 int set_dev_action_async(const HSB_ACTION_T *act, void *reply);
 
 int get_dev_timer(uint32_t dev_id, uint16_t timer_id, HSB_TIMER_T *timer);
@@ -245,7 +246,7 @@ int dev_online(uint32_t drvid, HSB_DEV_INFO_T *info, uint32_t *devid, HSB_DEV_OP
 int dev_offline(uint32_t devid);
 
 int dev_status_updated(uint32_t devid, HSB_STATUS_T *status);
-int dev_updated(uint32_t devid, HSB_DEV_UPDATED_TYPE_T type);
+int dev_updated(uint32_t devid, HSB_DEV_UPDATED_TYPE_T type, HSB_DEV_TYPE_T dev_type);
 int dev_sensor_triggered(uint32_t devid, HSB_SENSOR_TYPE_T type);
 int dev_sensor_recovered(uint32_t devid, HSB_SENSOR_TYPE_T type);
 int dev_ir_key(uint32_t devid, uint16_t param1, uint32_t param2);
@@ -270,6 +271,8 @@ typedef enum {
 	HSB_IR_PROTOCOL_TYPE_GREE,
 	HSB_IR_PROTOCOL_TYPE_LAST,
 } HSB_IR_PROTOCOL_TYPE_T;
+
+int report_all_device(void);
 
 #endif
 

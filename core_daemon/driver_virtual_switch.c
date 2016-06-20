@@ -18,11 +18,9 @@ typedef struct {
 typedef struct {
 	uint16_t	dev_class;
 	uint16_t	interface;
+	uint32_t	dev_type;
 	uint8_t		mac[6];
 	uint8_t		resv[2];
-	uint32_t	status_bm;
-	uint32_t	event_bm;
-	uint32_t	action_bm;
 } VS_INFO_T;
 
 typedef enum {
@@ -150,7 +148,7 @@ static int virtual_switch_probe(void)
 			continue;
 		}
 
-		count = 32;
+		count = 24;
 		int cmd = GET_CMD_FIELD(rbuf, 0, uint16_t);
 		int len = GET_CMD_FIELD(rbuf, 2, uint16_t);
 
