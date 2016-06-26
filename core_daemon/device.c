@@ -860,27 +860,35 @@ void _process_dev_act(HSB_ACT_T *act)
 				return;
 
 			resp.type = HSB_RESP_TYPE_RESULT;
+			resp.u.result.devid = 0;
+			resp.u.result.cmd = HSB_CMD_PROBE_DEV;
 			resp.u.result.ret_val = ret;
 
 			break;
 		}
 		case HSB_ACT_TYPE_SET_STATUS:
 		{
-			ret = set_dev_status(&act->u.status);
+			HSB_STATUS_T *pstat = &act->u.status;
+			ret = set_dev_status(pstat);
 			if (!reply)
 				return;
 
 			resp.type = HSB_RESP_TYPE_RESULT;
+			resp.u.result.devid = pstat->devid;
+			resp.u.result.cmd = HSB_CMD_SET_STATUS;
 			resp.u.result.ret_val = ret;
 
 			break;
 		}
 		case HSB_ACT_TYPE_GET_STATUS:
 		{
-			ret = get_dev_status(&act->u.status);
+			HSB_STATUS_T *pstat = &act->u.status;
+			ret = get_dev_status(pstat);
 
 			if (HSB_E_OK != ret) {
 				resp.type = HSB_RESP_TYPE_RESULT;
+				resp.u.result.devid = pstat->devid;
+				resp.u.result.cmd = HSB_CMD_GET_STATUS;
 				resp.u.result.ret_val = ret;
 			} else {
 				resp.type = HSB_RESP_TYPE_STATUS;
@@ -891,14 +899,17 @@ void _process_dev_act(HSB_ACT_T *act)
 		}
 		case HSB_ACT_TYPE_DO_ACTION:
 		{
-			ret = set_dev_action(&act->u.action);
+			HSB_ACTION_T *pact = &act->u.action;
+			ret = set_dev_action(pact);
 			if (!reply)
 				return;
 
-			if (act->u.action.id == HSB_ACT_TYPE_REMOTE_CONTROL)
+			if (pact->id == HSB_ACT_TYPE_REMOTE_CONTROL)
 				usleep(200000);
 
 			resp.type = HSB_RESP_TYPE_RESULT;
+			resp.u.result.devid = pact->devid;
+			resp.u.result.cmd = HSB_CMD_DO_ACTION;
 			resp.u.result.ret_val = ret;
 
 			break;

@@ -44,7 +44,7 @@ static int deal_udp_pkt(int fd, uint8_t *buf, size_t count, struct sockaddr *cli
 			SET_CMD_FIELD(rbuf, 5, uint8_t, 1);
 			SET_CMD_FIELD(rbuf, 8, uint16_t, 4);
 			SET_CMD_FIELD(rbuf, 10, uint16_t, 0);
-			SET_CMD_FIELD(rbuf, 12, uint32_t, 0);
+			SET_CMD_FIELD(rbuf, 12, uint32_t, 2);
 
 			memcpy(rbuf + 16, mac, 6);
 

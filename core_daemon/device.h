@@ -37,6 +37,8 @@ typedef struct {
 
 typedef struct {
 	HSB_ERROR_NO_T		ret_val;
+	uint32_t		devid;
+	uint16_t		cmd;
 } HSB_RESULT_T;
 
 typedef enum {

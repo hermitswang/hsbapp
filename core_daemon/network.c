@@ -41,13 +41,15 @@ static int check_tcp_pkt_valid(uint8_t *buf, int len)
 	return 0;
 }
 
-static int _reply_result(uint8_t *buf, int ok)
+static int _reply_result(uint8_t *buf, int errcode, uint32_t devid, uint16_t cmd)
 {
-	int len = 8;
+	int len = 12;
 
 	MAKE_CMD_HDR(buf, HSB_CMD_RESULT, len);
 
-	SET_CMD_FIELD(buf, 4, uint16_t, ok);
+	SET_CMD_FIELD(buf, 4, uint32_t, devid);
+	SET_CMD_FIELD(buf, 8, uint16_t, cmd);
+	SET_CMD_FIELD(buf, 10, uint16_t, errcode);
 
 	return len;
 }
@@ -209,9 +211,11 @@ static int _make_notify_resp(uint8_t *buf, HSB_RESP_T *resp)
 			SET_CMD_FIELD(buf, 12, uint32_t, resp->u.event.param2);
 			break;
 		case HSB_RESP_TYPE_RESULT:
-			len = 8;
+			len = 12;
 			MAKE_CMD_HDR(buf, HSB_CMD_RESULT, len);
-			SET_CMD_FIELD(buf, 4, uint16_t, resp->u.result.ret_val);
+			SET_CMD_FIELD(buf, 4, uint32_t, resp->u.result.devid);
+			SET_CMD_FIELD(buf, 8, uint16_t, resp->u.result.cmd);
+			SET_CMD_FIELD(buf, 10, uint16_t, resp->u.result.ret_val);
 			break;
 		case HSB_RESP_TYPE_STATUS:
 		{
@@ -264,7 +268,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			int dev_num;
 			ret = get_dev_id_list(dev_id, &dev_num);
 			if (HSB_E_OK != ret)
-				rlen = _reply_result(reply_buf, ret);
+				rlen = _reply_result(reply_buf, ret, 0, cmd);
 			else
 				rlen = _reply_dev_id_list(reply_buf, dev_id, dev_num);
 
@@ -276,7 +280,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			uint32_t dev_id = GET_CMD_FIELD(buf, 4, uint32_t);
 			ret = get_dev_info(dev_id, &dev);
 			if (HSB_E_OK != ret)
-				rlen = _reply_result(reply_buf, ret);
+				rlen = _reply_result(reply_buf, ret, dev_id, cmd);
 			else
 				rlen = _reply_get_device_info(reply_buf, &dev);
 
@@ -288,7 +292,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			uint32_t dev_id = GET_CMD_FIELD(buf, 4, uint32_t);
 			ret = get_dev_cfg(dev_id, &cfg);
 			if (HSB_E_OK != ret)
-				rlen = _reply_result(reply_buf, ret);
+				rlen = _reply_result(reply_buf, ret, dev_id, cmd);
 			else
 				rlen = _reply_get_device_cfg(reply_buf, dev_id, &cfg);
 
@@ -303,7 +307,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 
 			ret = set_dev_cfg(dev_id, &cfg);
 
-			rlen = _reply_result(reply_buf, ret);
+			rlen = _reply_result(reply_buf, ret, dev_id, cmd);
 
 			break;
 		}
@@ -343,7 +347,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 
 			ret = set_dev_channel(devid, name, cid);
 
-			rlen = _reply_result(reply_buf, ret);
+			rlen = _reply_result(reply_buf, ret, devid, cmd);
 
 			break;
 		}
@@ -357,7 +361,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 
 			ret = del_dev_channel(devid, name);
 
-			rlen = _reply_result(reply_buf, ret);
+			rlen = _reply_result(reply_buf, ret, devid, cmd);
 
 			break;
 		}
@@ -373,7 +377,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			ret = get_dev_channel(devid, name, &cid);
 			
 			if (HSB_E_OK != ret) {
-				rlen = _reply_result(reply_buf, ret);
+				rlen = _reply_result(reply_buf, ret, devid, cmd);
 				break;
 			}
 
@@ -396,7 +400,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 
 			ret = get_dev_timer(dev_id, timer_id, &tm);
 			if (HSB_E_OK != ret)
-				rlen = _reply_result(reply_buf, ret);
+				rlen = _reply_result(reply_buf, ret, dev_id, cmd);
 			else
 				rlen = _reply_get_timer(reply_buf, dev_id, &tm);
 
@@ -423,7 +427,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			if (ret)
 				hsb_debug("set_dev_timer ret=%d\n", ret);
 
-			rlen = _reply_result(reply_buf, ret);
+			rlen = _reply_result(reply_buf, ret, dev_id, cmd);
 			break;
 		}
 		case HSB_CMD_DEL_TIMER:
@@ -432,7 +436,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			uint16_t timer_id = GET_CMD_FIELD(buf, 8, uint16_t);
 
 			ret = del_dev_timer(dev_id, timer_id);
-			rlen = _reply_result(reply_buf, ret);
+			rlen = _reply_result(reply_buf, ret, dev_id, cmd);
 			break;
 		}
 		case HSB_CMD_GET_DELAY:
@@ -443,7 +447,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 
 			ret = get_dev_delay(dev_id, delay_id, &delay);
 			if (HSB_E_OK != ret)
-				rlen = _reply_result(reply_buf, ret);
+				rlen = _reply_result(reply_buf, ret, dev_id, cmd);
 			else
 				rlen = _reply_get_delay(reply_buf, dev_id, &delay);
 
@@ -467,7 +471,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			delay.delay_sec = GET_CMD_FIELD(buf, 28, uint32_t);
 
 			ret = set_dev_delay(dev_id, &delay);
-			rlen = _reply_result(reply_buf, ret);
+			rlen = _reply_result(reply_buf, ret, dev_id, cmd);
 
 			break;
 		}
@@ -477,7 +481,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			uint16_t delay_id = GET_CMD_FIELD(buf, 8, uint16_t);
 
 			ret = del_dev_delay(dev_id, delay_id);
-			rlen = _reply_result(reply_buf, ret);
+			rlen = _reply_result(reply_buf, ret, dev_id, cmd);
 
 			break;
 		}
@@ -489,7 +493,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 
 			ret = get_dev_linkage(dev_id, link_id, &link);
 			if (HSB_E_OK != ret)
-				rlen = _reply_result(reply_buf, ret);
+				rlen = _reply_result(reply_buf, ret, dev_id, cmd);
 			else
 				rlen = _reply_get_linkage(reply_buf, dev_id, &link);
 
@@ -513,7 +517,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			link.act_param2 = GET_CMD_FIELD(buf, 28, uint32_t);
 
 			ret = set_dev_linkage(dev_id, &link);
-			rlen = _reply_result(reply_buf, ret);
+			rlen = _reply_result(reply_buf, ret, dev_id, cmd);
 			break;
 		}
 		case HSB_CMD_DEL_LINKAGE:
@@ -522,7 +526,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			uint16_t link_id = GET_CMD_FIELD(buf, 8, uint16_t);
 
 			ret = del_dev_linkage(dev_id, link_id);
-			rlen = _reply_result(reply_buf, ret);
+			rlen = _reply_result(reply_buf, ret, dev_id, cmd);
 			break;
 		}
 		case HSB_CMD_DO_ACTION:
@@ -533,20 +537,11 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			uint32_t param2 = GET_CMD_FIELD(buf, 12, uint32_t);
 			HSB_ACTION_T act = { 0 };
 
-			if (act_id == HSB_ACT_TYPE_REMOTE_CONTROL) {
-				act.devid = dev_id;
-				ret = remote_key_mapping(param1, param2, &act);
-				if (HSB_E_OK != ret) {
-					rlen = _reply_result(reply_buf, ret);
-					break;
-				}
-			} else {
-				/* TODO */
-				act.devid = dev_id;
-				act.id = act_id;
-				act.param1 = param1;
-				act.param2 = param2;
-			}
+			/* TODO */
+			act.devid = dev_id;
+			act.id = act_id;
+			act.param1 = param1;
+			act.param2 = param2;
 
 			ret = set_dev_action_async(&act, reply);
 
@@ -578,12 +573,12 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 
 			ret = add_dev(drvid, dev_type);
 
-			rlen = _reply_result(reply_buf, ret);
+			rlen = _reply_result(reply_buf, ret, 0, cmd);
 
 			break;
 		}
 		default:
-			rlen = _reply_result(reply_buf, REPLY_FAIL);
+			rlen = _reply_result(reply_buf, REPLY_FAIL, 0, cmd);
 			break;
 	}
 
@@ -824,6 +819,7 @@ static void *tcp_listen_thread(void *arg)
 
 		g_thread_pool_push(client_pool.pool, (gpointer)pctx, NULL);
 
+		usleep(1000000);
 		report_all_device();
 	}
 

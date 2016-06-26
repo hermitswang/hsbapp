@@ -393,6 +393,7 @@ static int _register_device(struct in_addr *addr, VS_INFO_T *info)
 	HSB_DEV_INFO_T dev_info = { 0 };
 	dev_info.cls = info->dev_class;
 	dev_info.interface = info->interface;
+	dev_info.dev_type = info->dev_type;
 	memcpy(dev_info.mac, info->mac, 6);
 	
 	int ret = dev_online(virtual_switch_drv.id, &dev_info, &devid, &virtual_switch_op, NULL);

@@ -162,6 +162,7 @@ static int ir_add_dev(HSB_DEV_TYPE_T ir_type)
 	uint32_t devid;
 	HSB_DEV_INFO_T dev_info = { 0 };
 	dev_info.interface = HSB_INTERFACE_IR;
+	dev_info.dev_type = ir_type;
 
 	HSB_DEV_OP_T *op = NULL;
 	// ir_type to dev op
