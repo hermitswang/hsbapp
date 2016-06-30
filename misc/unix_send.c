@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
 	socklen_t socklen = sizeof(struct sockaddr_in);
 
 	if (argc < 2) {
-		printf("Usage: %s ip\n", argv[0]);
+		printf("Usage: %s ip port\n", argv[0]);
 		return -2;
 	}
 
@@ -39,9 +39,13 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	int port = atoi(argv[2]);
+
+	printf("send to port %d\n", port);
+
 	addr.sin_family = AF_INET;
 	inet_aton(argv[1], &addr.sin_addr);
-	addr.sin_port = htons(18020);
+	addr.sin_port = htons(port);
 
 	int nread, inputfd = 0;
 	fd_set readset;

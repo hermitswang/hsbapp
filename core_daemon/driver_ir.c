@@ -109,7 +109,7 @@ static int cc9201_set_status(const HSB_STATUS_T *status)
 			id = channel % 10;
 			cc9201_key_press(irdev, HSB_TV_ACTION_KEY_0 + id);
 
-			pdev->status[HSB_TV_STATUS_CHANNEL] = channel;
+			pdev->status.val[HSB_TV_STATUS_CHANNEL] = channel;
 			break;
 		}
 		default:
@@ -130,7 +130,7 @@ static int cc9201_get_status(HSB_STATUS_T *status)
 	if (id >= HSB_TV_STATUS_LAST)
 		return HSB_E_OTHERS;
 
-	status->val[0] = pdev->status[id];
+	status->val[0] = pdev->status.val[id];
 	status->num = 1;
 
 	return HSB_E_OK;
@@ -164,11 +164,16 @@ static int ir_add_dev(HSB_DEV_TYPE_T ir_type)
 	dev_info.interface = HSB_INTERFACE_IR;
 	dev_info.dev_type = ir_type;
 
+	HSB_DEV_STATUS_T status = { 0 };
+
 	HSB_DEV_OP_T *op = NULL;
 	// ir_type to dev op
 	switch (ir_type) {
 		case HSB_DEV_TYPE_CC9201:
 			dev_info.cls = HSB_DEV_CLASS_STB;
+
+			status.num = 1;
+
 			op = &cc9201_op;
 			break;
 		default:
@@ -186,7 +191,7 @@ static int ir_add_dev(HSB_DEV_TYPE_T ir_type)
 			return ret;
 	}
 
-	ret = dev_online(ir_drv.id, &dev_info, &devid, op, priv);
+	ret = dev_online(ir_drv.id, &dev_info, &status, op, priv, &devid);
 	if (HSB_E_OK != ret)
 		return ret;
 

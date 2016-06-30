@@ -21,6 +21,8 @@ typedef struct {
 	uint32_t	dev_type;
 	uint8_t		mac[6];
 	uint8_t		resv[2];
+	uint16_t	status_num;
+	uint16_t	status[8];
 } VS_INFO_T;
 
 typedef enum {
@@ -142,22 +144,26 @@ static int virtual_switch_probe(void)
 	struct timeval tv = { 3, 0 };
 	
 	do {
+		count = 28;
 		ret = recvfrom_timeout(sockfd, rbuf, sizeof(rbuf), (struct sockaddr *)&devaddr, &devlen, &tv);
-		if (ret < count) {
+		if (ret > 0 && ret < count) {
 			hsb_critical("probe: get err pkt, len=%d\n", ret);
 			continue;
-		}
+		} else if (0 == ret)
+			break;
 
-		count = 24;
 		int cmd = GET_CMD_FIELD(rbuf, 0, uint16_t);
 		int len = GET_CMD_FIELD(rbuf, 2, uint16_t);
 
-		if (cmd != VS_CMD_DEVICE_DISCOVER_RESP || len != count) {
+		if (cmd != VS_CMD_DEVICE_DISCOVER_RESP || len < count) {
 			hsb_critical("probe: get err pkt, cmd=%x, len=%d\n", cmd, len);
 			continue;
 		}
 
-		_register_device(&devaddr.sin_addr, (VS_INFO_T *)(rbuf + 8));
+		VS_INFO_T info = { 0 };
+		memcpy(&info, rbuf + 8, len - 8);
+
+		_register_device(&devaddr.sin_addr, &info);
 
 	} while (tv.tv_sec > 0 && tv.tv_usec > 0);
 
@@ -386,17 +392,25 @@ static int _register_device(struct in_addr *addr, VS_INFO_T *info)
 	GQueue *queue = &gl_ctx.queue;
 	VS_DEV_T *pdev = _find_dev_by_mac(info->mac);
 	uint32_t devid;
+	int id;
 
 	if (pdev)
 		return HSB_E_OK;
+
+	HSB_DEV_STATUS_T status = { 0 };
+	status.num = info->status_num;
+	for (id = 0; id < info->status_num; id++)
+	{
+		status.val[id] = info->status[id];
+	}
 
 	HSB_DEV_INFO_T dev_info = { 0 };
 	dev_info.cls = info->dev_class;
 	dev_info.interface = info->interface;
 	dev_info.dev_type = info->dev_type;
 	memcpy(dev_info.mac, info->mac, 6);
-	
-	int ret = dev_online(virtual_switch_drv.id, &dev_info, &devid, &virtual_switch_op, NULL);
+
+	int ret = dev_online(virtual_switch_drv.id, &dev_info, &status, &virtual_switch_op, NULL, &devid);
 	if (HSB_E_OK != ret)
 		return ret;
 

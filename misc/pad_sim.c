@@ -12,7 +12,7 @@
 #include "network_utils.h"
 #include "net_protocol.h"
 
-static int deal_tcp_pkt(int fd, void *buf, size_t count)
+static int deal_tcp_pkt(int fd, void *buf, size_t count, int *used)
 {
 	int cnt;
 	uint32_t dev_id;
@@ -21,6 +21,8 @@ static int deal_tcp_pkt(int fd, void *buf, size_t count)
 	uint16_t len = GET_CMD_FIELD(buf, 2, uint16_t);
 
 	printf("get a cmd: %x\n", cmd);
+	
+	*used = len;
 
 	switch (cmd) {
 		case HSB_CMD_GET_DEVS_RESP:
@@ -143,12 +145,64 @@ static int deal_tcp_pkt(int fd, void *buf, size_t count)
 			uint32_t evt_param2 = GET_CMD_FIELD(buf, 12, uint32_t);
 
 			printf("dev %d event: id=%d, param1=%d, param2=%x\n", dev_id, evt_id, evt_param1, evt_param2);
+			switch (evt_id) {
+				case HSB_EVT_TYPE_STATUS_UPDATED:
+					printf("status[%d]=%d\n", evt_param1, evt_param2);
+					break;
+				case HSB_EVT_TYPE_DEV_UPDATED:
+					if (evt_param1 > 0)
+						printf("device %d online\n", dev_id);
+					else
+						printf("device %d offline\n", dev_id);
+					break;
+				case HSB_EVT_TYPE_SENSOR_TRIGGERED:
+					break;
+				case HSB_EVT_TYPE_SENSOR_RECOVERED:
+					break;
+				case HSB_EVT_TYPE_MODE_CHANGED:
+					break;
+				case HSB_EVT_TYPE_IR_KEY:
+					break;
+				default:
+					break;
+			}
 			break;
 		}
 		case HSB_CMD_RESULT:
 		{
-			uint16_t result = GET_CMD_FIELD(buf, 4, uint16_t);
+			uint16_t result = GET_CMD_FIELD(buf, 10, uint16_t);
 			printf("result=%d\n", result);
+			break;
+		}
+		case HSB_CMD_DEV_ONLINE:
+		{
+			dev_id = GET_CMD_FIELD(buf, 4, uint32_t);
+			uint32_t drvid = GET_CMD_FIELD(buf, 8, uint32_t);
+			uint16_t dev_class = GET_CMD_FIELD(buf, 12, uint16_t);
+			uint16_t interface = GET_CMD_FIELD(buf, 14, uint16_t);
+			uint32_t dev_type = GET_CMD_FIELD(buf, 16, uint32_t);
+
+			uint8_t mac[8];
+			memcpy(mac, buf + 20, 8);
+
+			printf("dev online: id=%d, drv=%d, class=%d, interface=%d, mac=%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\n",
+				dev_id, drvid, dev_class, interface, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], mac[6], mac[7]);
+
+			char name[16], location[16];
+			strncpy(name, buf + 28, sizeof(name));
+			strncpy(location, buf + 44, sizeof(location));
+
+			printf("name=%s location=%s\n", name, location);
+
+			uint16_t id, val;
+
+			for (cnt = 0; cnt < (len - 60) / 4; cnt++) {
+				id = GET_CMD_FIELD(buf, 60 + cnt * 4, uint16_t);
+				val = GET_CMD_FIELD(buf, 62 + cnt * 4, uint16_t);
+				printf("status[%d]=%d\n", id, val);
+			}
+
+
 			break;
 		}
 		default:
@@ -327,7 +381,13 @@ static int control_box(struct in_addr *addr)
 				break;
 			}
 
-			deal_tcp_pkt(sockfd, buf, nread);
+			int tmp, nwrite = 0;
+			while (nwrite < nread) {
+				deal_tcp_pkt(sockfd, buf + nwrite, nread - nwrite, &tmp);
+
+				nwrite += tmp;
+			}
+
 		}
 
 		if (FD_ISSET(inputfd, &readset)) {

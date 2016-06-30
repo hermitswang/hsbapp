@@ -47,12 +47,10 @@ typedef struct {
 } HSB_DEVICE_DRIVER_CONTEXT_T;
 
 typedef struct {
-	uint16_t	dev_class;
-	uint16_t	interface;
+	uint32_t	dev_type;
 	uint8_t		mac[8];
-	uint32_t	status_bm;
-	uint32_t	event_bm;
-	uint32_t	action_bm;
+	uint16_t	status_num;
+	uint16_t	status[8];
 } CZ_INFO_T;
 
 typedef enum {
@@ -63,8 +61,7 @@ typedef enum {
 } CZ_EVT_TYPE_T;
 
 typedef enum {
-	CZ_STATUS_TYPE_ON_OFF = 1,
-	CZ_STATUS_TYPE_RO_DOOR = 16,
+	CZ_STATUS_TYPE_ON_OFF = 0,
 } CZ_STATUS_TYPE_T;
 
 typedef struct {
@@ -80,7 +77,6 @@ static HSB_DEVICE_DRIVER_CONTEXT_T gl_ctx = { 0 };
 static HSB_DEV_DRV_T cz_drv;
 static HSB_DEV_OP_T sample_op;
 static HSB_DEV_DRV_OP_T cz_drv_op;
-
 
 static CZ_DEV_T *_find_dev_by_mac(uint8_t *mac)
 {
@@ -152,16 +148,25 @@ static int _register_device(uint16_t short_addr, uint16_t end_point, CZ_INFO_T *
 	GQueue *queue = &gl_ctx.queue;
 	CZ_DEV_T *pdev = _find_dev_by_mac(info->mac);
 	uint32_t devid;
+	int id;
 
 	if (pdev)
 		return HSB_E_OK;
 
+	HSB_DEV_STATUS_T status = { 0 };
+	status.num = info->status_num;
+	for (id = 0; id < info->status_num; id++)
+	{
+		status.val[id] = info->status[id];
+	}
+
 	HSB_DEV_INFO_T dev_info;
-	dev_info.cls = info->dev_class;
-	dev_info.interface = info->interface;
+	dev_info.cls = 0; // TODO
+	dev_info.interface = 0; // TODO
+	dev_info.dev_type = info->dev_type;
 	memcpy(dev_info.mac, info->mac, 8);
 	
-	int ret = dev_online(cz_drv.id, &dev_info, &devid, &sample_op, NULL);
+	int ret = dev_online(cz_drv.id, &dev_info, &status, &sample_op, NULL, &devid);
 	if (HSB_E_OK != ret)
 		return ret;
 
@@ -291,7 +296,7 @@ static int sample_set_status(const HSB_STATUS_T *status)
 		goto fail;
 	}
 
-	if (!result) {
+	if (result) {
 		hsb_debug("set status result=%d\n", result);
 		ret = HSB_E_ACT_FAILED;
 		goto fail;
@@ -452,7 +457,7 @@ static int sample_set_action(const HSB_ACTION_T *act)
 		goto fail;
 	}
 
-	if (!result) {
+	if (result) {
 		hsb_debug("set action result=%d\n", result);
 		ret = HSB_E_ACT_FAILED;
 		goto fail;
@@ -567,12 +572,13 @@ int deal_recv_buf(uint8_t *buf, int len)
 	uint16_t cmd = GET_CMD_FIELD(ptr, 0, uint16_t);
 	uint16_t rlen = GET_CMD_FIELD(ptr, 2, uint16_t);
 
-	int count = 32;
 	CZ_DEV_T *pdev;
 
 	if (0 == trans_id) {
 		switch (cmd) {
 			case CZ_CMD_DEVICE_DISCOVER_RESP:
+			{
+				int count = 24;
 				if (count != rlen) {
 					hsb_critical("probe: get err pkt, cmd=%x, len=%d\n", cmd, rlen);
 					return HSB_E_OTHERS;
@@ -580,6 +586,7 @@ int deal_recv_buf(uint8_t *buf, int len)
 
 				_register_device(short_addr, end_point, (CZ_INFO_T *)(ptr + 8));
 				break;
+			}
 			case CZ_CMD_EVENT:
 			{
 				uint16_t id = GET_CMD_FIELD(ptr, 4, uint16_t);
@@ -633,9 +640,9 @@ int deal_recv_buf(uint8_t *buf, int len)
 	memcpy(pctx->recv_buf, buf, len);
 	pctx->recv_len = len;
 
-	pthread_cond_signal(&pctx->condition);
-
 	COND_UNLOCK();
+
+	pthread_cond_signal(&pctx->condition);
 
 	return HSB_E_OK;
 }

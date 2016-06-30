@@ -70,7 +70,7 @@ static int _reply_dev_id_list(uint8_t *buf, uint32_t *dev_id, int dev_num)
 
 static int _reply_get_device_info(uint8_t *buf, HSB_DEV_T *dev)
 {
-	int len = 24;
+	int len = 26;
 
 	MAKE_CMD_HDR(buf, HSB_CMD_GET_INFO_RESP, len);
 
@@ -78,7 +78,8 @@ static int _reply_get_device_info(uint8_t *buf, HSB_DEV_T *dev)
 	SET_CMD_FIELD(buf, 8, uint32_t, dev->driver->id); /* driver id */
 	SET_CMD_FIELD(buf, 12, uint16_t, dev->info.cls); /* device class */
 	SET_CMD_FIELD(buf, 14, uint16_t, dev->info.interface); /* device interface */
-	memcpy(buf + 16, dev->info.mac, 6); /* mac address */
+	SET_CMD_FIELD(buf, 16, uint32_t, dev->info.dev_type);
+	memcpy(buf + 18, dev->info.mac, 8); /* mac address */
 
 	return len;
 }
@@ -197,12 +198,51 @@ static int _get_dev_status(uint8_t *buf, int len, HSB_STATUS_T *status)
 	return 0;
 }
 
+static int _make_online_event(uint8_t *buf, uint32_t devid)
+{
+	int ret, id;
+	HSB_DEV_T dev;
+	ret = get_dev_info(devid, &dev);
+
+	int len = 60 + 4 * dev.status.num;
+
+	MAKE_CMD_HDR(buf, HSB_CMD_DEV_ONLINE, len);
+
+	SET_CMD_FIELD(buf, 4, uint32_t, dev.id); /* device id */
+	SET_CMD_FIELD(buf, 8, uint32_t, dev.driver->id); /* driver id */
+	SET_CMD_FIELD(buf, 12, uint16_t, dev.info.cls); /* device class */
+	SET_CMD_FIELD(buf, 14, uint16_t, dev.info.interface); /* device interface */
+	SET_CMD_FIELD(buf, 16, uint32_t, dev.info.dev_type);
+	memcpy(buf + 20, dev.info.mac, 8); /* mac address */
+
+	memcpy(buf + 28, dev.config.name, 16);
+	memcpy(buf + 44, dev.config.location, 16);
+
+	for (id = 0; id < dev.status.num; id++)
+	{
+		SET_CMD_FIELD(buf, 60 + id * 4, uint16_t, id);
+		SET_CMD_FIELD(buf, 62 + id * 4, uint16_t, dev.status.val[id]);
+	}
+
+
+	return len;
+}
+
 static int _make_notify_resp(uint8_t *buf, HSB_RESP_T *resp)
 {
 	int len = 0;
 
 	switch (resp->type) {
 		case HSB_RESP_TYPE_EVENT:
+
+			if (resp->u.event.id == HSB_EVT_TYPE_DEV_UPDATED &&
+				((resp->u.event.param1 == HSB_DEV_UPDATED_TYPE_ONLINE) ||
+				(resp->u.event.param1 == HSB_DEV_UPDATED_TYPE_NEW_ADD)))
+			{
+				return _make_online_event(buf, resp->u.event.devid);
+			}
+
+
 			len = 16;
 			MAKE_CMD_HDR(buf, HSB_CMD_EVENT, len);
 			SET_CMD_FIELD(buf, 4, uint32_t, resp->u.event.devid);
@@ -820,7 +860,7 @@ static void *tcp_listen_thread(void *arg)
 		g_thread_pool_push(client_pool.pool, (gpointer)pctx, NULL);
 
 		usleep(1000000);
-		report_all_device();
+		report_all_device(pctx);
 	}
 
 	hsb_critical("tcp listen thread closed\n");
@@ -831,7 +871,7 @@ static void *tcp_listen_thread(void *arg)
 static int _process_notify(int fd, tcp_client_context *pctx)
 {
 	HSB_RESP_T *resp = NULL;
-	uint8_t buf[64];
+	uint8_t buf[128];
 	int ret, len;
 
 	while (!g_queue_is_empty(&pctx->queue)) {
@@ -840,12 +880,11 @@ static int _process_notify(int fd, tcp_client_context *pctx)
 		memset(buf, 0, sizeof(buf));
 
 		len = _make_notify_resp(buf, resp);
+		g_slice_free(HSB_RESP_T, resp);
 
 		ret = write(fd, buf, len);
 		if (ret <= 0)
 			return ret;
-
-		g_slice_free(HSB_RESP_T, resp);
 	}
 
 	return 0;
@@ -904,11 +943,40 @@ static void tcp_client_handler(gpointer data, gpointer user_data)
 
 #define NOTIFY_MESSAGE	"notify"
 
-int notify_resp(HSB_RESP_T *msg)
+int notify_resp(HSB_RESP_T *msg, void *data)
 {
 	int cnt, fd;
 	HSB_RESP_T *notify = NULL;
 	tcp_client_context *pctx = NULL;
+
+	if (msg->reply)
+		pctx = (tcp_client_context *)msg->reply;
+	else if (data)
+		pctx = (tcp_client_context *)data;
+
+	if (pctx) {
+		if (!pctx->using)
+			return HSB_E_OK;
+
+		notify = g_slice_dup(HSB_RESP_T, msg);
+		if (!notify) {
+			hsb_debug("no memory\n");
+			return HSB_E_NO_MEMORY;
+		}
+
+		g_mutex_lock(&pctx->mutex);
+
+		g_queue_push_tail(&pctx->queue, notify);
+
+		g_mutex_unlock(&pctx->mutex);
+
+		fd = unix_socket_new();
+		unix_socket_send_to(fd, pctx->listen_path, NOTIFY_MESSAGE, strlen(NOTIFY_MESSAGE));
+		unix_socket_free(fd);
+
+		return HSB_E_OK;
+	}
+
 
 	for (cnt = 0; cnt < MAX_TCP_CLIENT_NUM; cnt++) {
 		pctx = &client_pool.context[cnt];

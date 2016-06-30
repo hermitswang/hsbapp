@@ -159,6 +159,11 @@ typedef struct {
 #define HSB_DEV_MAX_LOCATION_LEN	(16)
 
 typedef struct {
+	uint16_t	num;
+	uint16_t	val[8];
+} HSB_DEV_STATUS_T;
+
+typedef struct {
 	HSB_DEV_CLASS_T		cls;
 	uint32_t		interface;
 	uint32_t		dev_type;
@@ -181,8 +186,7 @@ typedef struct _HSB_DEV_T {
 
 	uint32_t		state;
 
-	uint32_t		status[8];
-	int			status_num;
+	HSB_DEV_STATUS_T	status;
 
 	HSB_DEV_INFO_T		info;
 
@@ -244,7 +248,7 @@ HSB_DEV_T *create_dev(void);
 int destroy_dev(HSB_DEV_T *dev);
 int register_dev(HSB_DEV_T *dev);
 int remove_dev(HSB_DEV_T *dev);
-int dev_online(uint32_t drvid, HSB_DEV_INFO_T *info, uint32_t *devid, HSB_DEV_OP_T *op, void *priv);
+int dev_online(uint32_t drvid, HSB_DEV_INFO_T *info, HSB_DEV_STATUS_T *status, HSB_DEV_OP_T *op, void *priv, uint32_t *devid);
 int dev_offline(uint32_t devid);
 
 int dev_status_updated(uint32_t devid, HSB_STATUS_T *status);
@@ -267,14 +271,7 @@ int set_dev_channel(uint32_t devid, char *name, uint32_t cid);
 int del_dev_channel(uint32_t devid, char *name);
 int get_dev_channel(uint32_t devid, char *name, uint32_t *cid);
 
-typedef enum {
-	HSB_IR_PROTOCOL_TYPE_CC9201 = 0,
-	HSB_IR_PROTOCOL_TYPE_NEC,
-	HSB_IR_PROTOCOL_TYPE_GREE,
-	HSB_IR_PROTOCOL_TYPE_LAST,
-} HSB_IR_PROTOCOL_TYPE_T;
-
-int report_all_device(void);
+int report_all_device(void *data);
 
 #endif
 

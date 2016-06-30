@@ -84,7 +84,7 @@ HSB_DEV_T *find_dev(uint32_t dev_id)
 	return NULL;
 }
 
-int report_all_device(void)
+int report_all_device(void *data)
 {
 	guint len, id;
 	GQueue *queue = &gl_dev_cb.queue;
@@ -100,7 +100,17 @@ int report_all_device(void)
 			break;
 		}
 
-		dev_updated(pdev->id, HSB_DEV_UPDATED_TYPE_ONLINE, pdev->info.dev_type);
+		HSB_RESP_T resp = { 0 };
+
+		resp.type = HSB_RESP_TYPE_EVENT;
+		resp.reply = NULL;
+		resp.u.event.devid = pdev->id;
+		resp.u.event.id = HSB_EVT_TYPE_DEV_UPDATED;
+		resp.u.event.param1 = HSB_DEV_UPDATED_TYPE_ONLINE;
+		resp.u.event.param2 = pdev->info.dev_type;
+
+
+		notify_resp(&resp, data);
 	}
 
 	HSB_DEVICE_CB_UNLOCK();
@@ -328,6 +338,23 @@ int get_dev_status(HSB_STATUS_T *status)
 	return ret;
 }
 
+static int sync_dev_status(HSB_DEV_T *pdev, const HSB_STATUS_T *status)
+{
+	int cnt, id, val;
+
+	for (cnt = 0; cnt < status->num; cnt++) {
+		id = status->id[cnt];
+		val = status->val[cnt];
+
+		if (id > 8)
+			continue;
+
+		pdev->status.val[id] =  val;
+	}
+
+	return HSB_E_OK;
+}
+
 int set_dev_status(const HSB_STATUS_T *status)
 {
 	int ret = HSB_E_NOT_SUPPORTED;
@@ -340,8 +367,13 @@ int set_dev_status(const HSB_STATUS_T *status)
 	if (!pdev)
 		return HSB_E_ENTRY_NOT_FOUND;
 
-	if (pdev->op && pdev->op->set_status)
-		return pdev->op->set_status(status);
+	if (pdev->op && pdev->op->set_status) {
+		ret = pdev->op->set_status(status);
+
+		if (HSB_E_OK == ret)
+			sync_dev_status(pdev, status);
+			
+	}
 
 	return ret;
 }
@@ -554,7 +586,22 @@ int remove_dev(HSB_DEV_T *dev)
 	return 0;
 }
 
-int dev_online(uint32_t drvid, HSB_DEV_INFO_T *info, uint32_t *devid, HSB_DEV_OP_T *op, void *priv)
+#include "hsb_const.h"
+
+static void get_default_config(uint32_t dev_type, HSB_DEV_CONFIG_T *config)
+{
+	if (dev_type < sizeof(default_config))
+		memcpy(config, &default_config[dev_type], sizeof(*config));
+	else
+		memset(config, 0, sizeof(*config));
+}
+
+int dev_online(uint32_t drvid,
+		HSB_DEV_INFO_T *info,
+		HSB_DEV_STATUS_T *status,
+		HSB_DEV_OP_T *op,
+		void *priv,
+		uint32_t *devid)
 {
 	int ret = HSB_E_OK;
 	GQueue *offq = &gl_dev_cb.offq;
@@ -587,7 +634,13 @@ int dev_online(uint32_t drvid, HSB_DEV_INFO_T *info, uint32_t *devid, HSB_DEV_OP
 		pdev->priv_data = priv;
 		pdev->state = HSB_DEV_STATE_ONLINE;
 
+		memcpy(&pdev->status, status, sizeof(*status));
 		memcpy(&pdev->info, info, sizeof(*info));
+
+		HSB_DEV_CONFIG_T config;
+		get_default_config(info->dev_type, &config);
+
+		memcpy(&pdev->config, &config, sizeof(config));
 
 		HSB_DEVICE_CB_LOCK();
 		g_queue_push_tail(queue, pdev);
@@ -601,6 +654,8 @@ int dev_online(uint32_t drvid, HSB_DEV_INFO_T *info, uint32_t *devid, HSB_DEV_OP
 		pdev->state = HSB_DEV_STATE_ONLINE;
 		g_queue_push_tail(queue, pdev);
 		HSB_DEVICE_CB_UNLOCK();
+
+		memcpy(&pdev->status, status, sizeof(*status));
 
 		update_link(pdev);
 
@@ -720,11 +775,15 @@ static _dev_event(uint32_t devid, HSB_EVT_TYPE_T type, uint16_t param1, uint32_t
 
 	hsb_debug("get event: %d, %d, %d, %x\n", devid, type, param1, param2);
 
-	return notify_resp(&resp);
+	return notify_resp(&resp, NULL);
 }
 
 int dev_status_updated(uint32_t devid, HSB_STATUS_T *status)
 {
+	HSB_DEV_T *pdev = find_dev(devid);
+	if (pdev)
+		sync_dev_status(pdev, (const HSB_STATUS_T *)status);
+
 	return _dev_event(devid, HSB_EVT_TYPE_STATUS_UPDATED, status->id[0], status->val[0]);
 }
 
@@ -924,7 +983,7 @@ void _process_dev_act(HSB_ACT_T *act)
 			break;
 	}
 
-	notify_resp(&resp);
+	notify_resp(&resp, NULL);
 
 	return;
 }
