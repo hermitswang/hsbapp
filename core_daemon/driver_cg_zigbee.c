@@ -578,8 +578,7 @@ int deal_recv_buf(uint8_t *buf, int len)
 		switch (cmd) {
 			case CZ_CMD_DEVICE_DISCOVER_RESP:
 			{
-				int count = 24;
-				if (count != rlen) {
+				if (rlen < 22) {
 					hsb_critical("probe: get err pkt, cmd=%x, len=%d\n", cmd, rlen);
 					return HSB_E_OTHERS;
 				}

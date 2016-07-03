@@ -273,5 +273,8 @@ int get_dev_channel(uint32_t devid, char *name, uint32_t *cid);
 
 int report_all_device(void *data);
 
+int sync_dev_status(HSB_DEV_T *pdev, const HSB_STATUS_T *status);
+int load_dev_status(HSB_DEV_T *pdev, HSB_STATUS_T *status);
+
 #endif
 

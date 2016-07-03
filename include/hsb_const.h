@@ -7,7 +7,7 @@ static HSB_DEV_CONFIG_T default_config[] = {
 	{ "sensor", "unknown" },
 	{ "remotectl", "unknown" },
 	{ "cc9201", "unknown" },
-	{ "grayac", "unknown" },
+	{ "greeac", "unknown" },
 };
 
 #endif

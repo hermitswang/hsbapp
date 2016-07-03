@@ -144,7 +144,7 @@ static int link_device(HSB_DEV_T *pdev)
 		    0 == strncmp(pdevice->config.location,
 				 pdev->config.location,
 				 sizeof(pdev->config.location)) &&
-		    pdevice->info.cls == HSB_DEV_CLASS_REMOTE_CONTROL)
+		    pdevice->info.dev_type == HSB_DEV_TYPE_REMOTE_CTL)
 		{
 			pdev->ir_dev = pdevice;
 			break;
@@ -159,7 +159,7 @@ static int link_device(HSB_DEV_T *pdev)
 
 static int update_link(HSB_DEV_T *pdev)
 {
-	if (pdev->info.cls != HSB_DEV_CLASS_REMOTE_CONTROL)
+	if (pdev->info.dev_type != HSB_DEV_TYPE_REMOTE_CTL)
 		return HSB_E_OK;
 
 	bool online = (pdev->state == HSB_DEV_STATE_ONLINE) ? true : false;
@@ -338,7 +338,7 @@ int get_dev_status(HSB_STATUS_T *status)
 	return ret;
 }
 
-static int sync_dev_status(HSB_DEV_T *pdev, const HSB_STATUS_T *status)
+int sync_dev_status(HSB_DEV_T *pdev, const HSB_STATUS_T *status)
 {
 	int cnt, id, val;
 
@@ -351,6 +351,20 @@ static int sync_dev_status(HSB_DEV_T *pdev, const HSB_STATUS_T *status)
 
 		pdev->status.val[id] =  val;
 	}
+
+	return HSB_E_OK;
+}
+
+int load_dev_status(HSB_DEV_T *pdev, HSB_STATUS_T *status)
+{
+	int id;
+
+	for (id = 0; id < pdev->status.num; id++) {
+		status->id[id] = id;
+		status->val[id] = pdev->status.val[id];
+	}
+
+	status->num = pdev->status.num;
 
 	return HSB_E_OK;
 }
@@ -1491,6 +1505,5 @@ int check_timer_and_delay(void)
 
 	return HSB_E_OK;
 }
-
 
 

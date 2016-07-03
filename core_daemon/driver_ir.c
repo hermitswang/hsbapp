@@ -15,6 +15,7 @@
 
 static HSB_DEV_DRV_T ir_drv;
 static HSB_DEV_OP_T cc9201_op;
+static HSB_DEV_OP_T gree_op;
 static HSB_DEV_DRV_OP_T ir_drv_op;
 
 typedef struct {
@@ -176,6 +177,13 @@ static int ir_add_dev(HSB_DEV_TYPE_T ir_type)
 
 			op = &cc9201_op;
 			break;
+		case HSB_DEV_TYPE_GREE_AC:
+			dev_info.cls = HSB_DEV_CLASS_AIR_CONDITIONER;
+
+			status.num = 5;
+
+			op = &gree_op;
+			break;
 		default:
 			break;
 	}
@@ -205,6 +213,71 @@ static HSB_DEV_OP_T cc9201_op = {
 	cc9201_init,
 	cc9201_release,
 	cc9201_get_channel_db,
+};
+
+typedef enum {
+	GREE_STATUS_ID_WORK_MODE = 0,
+	GREE_STATUS_ID_POWER,
+	GREE_STATUS_ID_WIND_SPEED,
+	GREE_STATUS_ID_TEMPERATURE,
+	GREE_STATUS_ID_LIGHT,
+} GREE_STATUS_ID;
+
+static int gree_set_status(const HSB_STATUS_T *status)
+{
+	HSB_DEV_T *pdev = find_dev(status->devid);
+
+	if (!pdev)
+		return HSB_E_OTHERS;
+
+	HSB_DEV_T *irdev = pdev->ir_dev;
+	if (!irdev)
+		return HSB_E_OTHERS;
+
+	sync_dev_status(pdev, status);
+
+	HSB_DEV_STATUS_T *pstat = &pdev->status;
+	uint8_t data[4];
+
+	data[0] = pstat->val[GREE_STATUS_ID_WORK_MODE] & 0x07;
+	if (pstat->val[GREE_STATUS_ID_POWER] > 0)
+		data[0] |= (1 << 3);
+	data[0] |= ((pstat->val[GREE_STATUS_ID_WIND_SPEED] & 0x3) << 4);
+
+	data[1] = pstat->val[GREE_STATUS_ID_TEMPERATURE] & 0x0F;
+
+	data[2] = pstat->val[GREE_STATUS_ID_LIGHT] ? 0x20 : 0;
+
+	data[3] = 0;
+
+	HSB_ACTION_T act = { 0 };
+	act.devid = irdev->id;
+	act.id = HSB_ACT_TYPE_REMOTE_CONTROL;
+	act.param1 = HSB_IR_PROTOCOL_TYPE_GREE;
+	act.param2 = *(uint32_t *)data;
+
+	return set_action(irdev, &act);
+}
+
+static int gree_get_status(HSB_STATUS_T *status)
+{
+	HSB_DEV_T *pdev = find_dev(status->devid);
+
+	if (!pdev)
+		return HSB_E_OTHERS;
+
+	load_dev_status(pdev, status);
+
+	return HSB_E_OK;
+}
+
+static HSB_DEV_OP_T gree_op = {
+	gree_get_status,
+	gree_set_status,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
 };
 
 static HSB_DEV_DRV_OP_T ir_drv_op = {
