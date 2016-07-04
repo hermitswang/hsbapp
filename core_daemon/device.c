@@ -798,7 +798,14 @@ int dev_status_updated(uint32_t devid, HSB_STATUS_T *status)
 	if (pdev)
 		sync_dev_status(pdev, (const HSB_STATUS_T *)status);
 
-	return _dev_event(devid, HSB_EVT_TYPE_STATUS_UPDATED, status->id[0], status->val[0]);
+	HSB_RESP_T resp = { 0 };
+	resp.type = HSB_RESP_TYPE_STATUS_UPDATE;
+	resp.reply = NULL;
+	memcpy(&resp.u.status, status, sizeof(*status));
+
+	// TODO: check linkage
+
+	return notify_resp(&resp, NULL);
 }
 
 int dev_updated(uint32_t devid, HSB_DEV_UPDATED_TYPE_T type, HSB_DEV_TYPE_T dev_type)

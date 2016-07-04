@@ -258,10 +258,15 @@ static int _make_notify_resp(uint8_t *buf, HSB_RESP_T *resp)
 			SET_CMD_FIELD(buf, 10, uint16_t, resp->u.result.ret_val);
 			break;
 		case HSB_RESP_TYPE_STATUS:
+		case HSB_RESP_TYPE_STATUS_UPDATE:
 		{
 			HSB_STATUS_T *pstat = &resp->u.status;
 			len = 8 + pstat->num * 4;
-			MAKE_CMD_HDR(buf, HSB_CMD_GET_STATUS_RESP, len);
+			if (resp->type == HSB_RESP_TYPE_STATUS)
+				MAKE_CMD_HDR(buf, HSB_CMD_GET_STATUS_RESP, len);
+			else
+				MAKE_CMD_HDR(buf, HSB_CMD_STATUS_UPDATE, len);
+				
 			SET_CMD_FIELD(buf, 4, uint32_t, pstat->devid);
 
 			int id;
@@ -269,8 +274,8 @@ static int _make_notify_resp(uint8_t *buf, HSB_RESP_T *resp)
 				SET_CMD_FIELD(buf, 8 + 4 * id, uint16_t, pstat->id[id]);
 				SET_CMD_FIELD(buf, 10 + 4 * id, uint16_t, pstat->val[id]);
 			}
-			break;
 		}
+			break;
 		default:
 			hsb_debug("invalid resp %d\n", resp->type);
 			break;
@@ -983,8 +988,7 @@ int notify_resp(HSB_RESP_T *msg, void *data)
 		if (!pctx->using)
 			continue;
 
-		if (msg->type != HSB_RESP_TYPE_EVENT &&
-		    msg->reply != (void *)pctx)
+		if (msg->reply && msg->reply != (void *)pctx)
 			continue;
 
 		notify = g_slice_dup(HSB_RESP_T, msg);

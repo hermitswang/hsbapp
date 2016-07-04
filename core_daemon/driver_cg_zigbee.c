@@ -13,7 +13,7 @@
 #include "hsb_error.h"
 #include "hsb_config.h"
 
-#define CZ_TEST
+//#define CZ_TEST
 
 #define COND_LOCK()	do { \
 	pthread_mutex_lock(&gl_ctx.cond_mutex); \
@@ -495,15 +495,9 @@ static HSB_DEV_DRV_T cz_drv = {
 	&cz_drv_op,
 };
 
-static int _status_updated(uint32_t devid, uint16_t id, uint16_t val)
+static int _status_updated(HSB_STATUS_T *status)
 {
-	HSB_STATUS_T status;
-	status.devid = devid;
-	status.num = 1;
-	status.id[0] = id;
-	status.val[0] = val;
-
-	return dev_status_updated(devid, &status);
+	return dev_status_updated(status->devid, status);
 }
 
 static int _key(uint16_t key)
@@ -606,8 +600,8 @@ int deal_recv_buf(uint8_t *buf, int len)
 				break;
 			case CZ_CMD_STATUS_CHANGED:
 			{
-				uint16_t id = GET_CMD_FIELD(ptr, 4, uint16_t);
-				uint16_t val = GET_CMD_FIELD(ptr, 6, uint16_t);
+				uint16_t id;
+				uint16_t val;
 
 				pdev = _find_dev_by_short_addr(short_addr);
 				if (!pdev) {
@@ -615,7 +609,19 @@ int deal_recv_buf(uint8_t *buf, int len)
 					return HSB_E_OTHERS;
 				}
 
-				_status_updated(pdev->id, id, val);
+				HSB_STATUS_T status = { 0 };
+				status.devid = pdev->id;
+				status.num = (rlen - 4) / 4;
+
+				int cnt;
+				for (cnt = 0; cnt < status.num; cnt++) {
+					id = GET_CMD_FIELD(ptr, 4 + cnt * 4, uint16_t);
+					val = GET_CMD_FIELD(ptr, 6 + cnt * 4, uint16_t);
+					status.id[cnt] = id;
+					status.val[cnt] = val;
+				}
+
+				_status_updated(&status);
 
 				break;
 			}

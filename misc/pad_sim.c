@@ -60,6 +60,7 @@ static int deal_tcp_pkt(int fd, void *buf, size_t count, int *used)
 			break;
 		}
 		case HSB_CMD_GET_STATUS_RESP:
+		case HSB_CMD_STATUS_UPDATE:
 		{
 			dev_id = GET_CMD_FIELD(buf, 4, uint32_t);
 			uint16_t id, val;
@@ -67,7 +68,7 @@ static int deal_tcp_pkt(int fd, void *buf, size_t count, int *used)
 			for (cnt = 0; cnt < (len - 8) / 4; cnt++) {
 				id = GET_CMD_FIELD(buf, 8 + cnt * 4, uint16_t);
 				val = GET_CMD_FIELD(buf, 10 + cnt * 4, uint16_t);
-				printf("get device %d status response: status %d=%d\n", dev_id, id, val);
+				printf("device %d status[%d]=%d\n", dev_id, id, val);
 			}
 
 			break;
