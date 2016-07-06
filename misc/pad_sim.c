@@ -59,6 +59,18 @@ static int deal_tcp_pkt(int fd, void *buf, size_t count, int *used)
 			printf("dev config: name=%s location=%s\n", name, location);
 			break;
 		}
+		case HSB_CMD_GET_CHANNEL_RESP:
+		{
+			char name[16];
+			uint32_t cid;
+
+			dev_id = GET_CMD_FIELD(buf, 4, uint32_t);
+			strncpy(name, buf + 8, sizeof(name));
+			cid = GET_CMD_FIELD(buf, 24, uint32_t);
+
+			printf("channel[%s]=%d\n", name, cid);
+			break;
+		}
 		case HSB_CMD_GET_STATUS_RESP:
 		case HSB_CMD_STATUS_UPDATE:
 		{
@@ -328,6 +340,11 @@ static int deal_input_cmd(int fd, void *buf, size_t count)
 		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
 		SET_CMD_FIELD(rbuf, 4, uint32_t, val1);
 		strncpy(rbuf + 8, name, sizeof(name));
+	} else if (1 == sscanf(buf, "get channel %d", &val1)) {
+		len = 8;
+		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_GET_CHANNEL);
+		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
+		SET_CMD_FIELD(rbuf, 4, uint32_t, val1);
 	} else if (4 == sscanf(buf, "action %d %d %d %x", &val1, &val2, &val3, &val4)) {
 		len = 16;
 		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_DO_ACTION);

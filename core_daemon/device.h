@@ -271,6 +271,8 @@ int check_timer_and_delay(void);
 int set_dev_channel(uint32_t devid, char *name, uint32_t cid);
 int del_dev_channel(uint32_t devid, char *name);
 int get_dev_channel(uint32_t devid, char *name, uint32_t *cid);
+int get_dev_channel_num(uint32_t devid, int *num);
+int get_dev_channel_by_id(uint32_t devid, int id, char *name, uint32_t *cid);
 
 int report_all_device(void *data);
 

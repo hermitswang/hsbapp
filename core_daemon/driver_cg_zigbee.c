@@ -550,6 +550,43 @@ static int _event(uint32_t devid, uint16_t id, uint16_t param, uint32_t param2)
 	return ret;
 }
 
+static int _remove_timeout_dev(void)
+{
+	GQueue *queue = &gl_ctx.queue;
+	int len = g_queue_get_length(queue);
+	int id;
+	CZ_DEV_T *pdev;
+
+	for (id = 0; id < len; ) {
+		pdev = g_queue_peek_nth(queue, id);
+		if (!pdev)
+			break;
+
+		if (pdev->idle_time > 10) {
+			dev_offline(pdev->id);
+
+			g_queue_pop_nth(queue, id);
+			hsb_debug("device offline 0x%x\n", pdev->short_addr);
+			g_slice_free(CZ_DEV_T, pdev);
+
+			continue;
+		}
+
+		pdev->idle_time++;
+
+		id++;
+	}
+
+	return 0;
+}
+
+static int _refresh_device(CZ_DEV_T *pdev)
+{
+	pdev->idle_time = 0;
+
+	return 0;
+}
+
 int deal_recv_buf(uint8_t *buf, int len)
 {
 	HSB_DEVICE_DRIVER_CONTEXT_T *pctx = &gl_ctx;
@@ -566,7 +603,7 @@ int deal_recv_buf(uint8_t *buf, int len)
 	uint16_t cmd = GET_CMD_FIELD(ptr, 0, uint16_t);
 	uint16_t rlen = GET_CMD_FIELD(ptr, 2, uint16_t);
 
-	CZ_DEV_T *pdev;
+	CZ_DEV_T *pdev = NULL;
 
 	if (0 == trans_id) {
 		switch (cmd) {
@@ -597,7 +634,10 @@ int deal_recv_buf(uint8_t *buf, int len)
 				break;
 			}
 			case CZ_CMD_KEEP_ALIVE:
+			{
+				pdev = _find_dev_by_short_addr(short_addr);
 				break;
+			}
 			case CZ_CMD_STATUS_CHANGED:
 			{
 				uint16_t id;
@@ -628,6 +668,9 @@ int deal_recv_buf(uint8_t *buf, int len)
 			default:
 				break;
 		}
+
+		if (pdev)
+			_refresh_device(pdev);
 
 		return HSB_E_OK;
 	}
@@ -676,8 +719,13 @@ static void *_monitor_thread(void *arg)
 
 		ret = select(maxfd + 1, &rset, NULL, NULL, &tv);
 
-		if (ret <= 0)
+		if (ret < 0)
 			continue;
+
+		if (0 == ret) {
+			_remove_timeout_dev();
+			continue;
+		}
 
 		if (FD_ISSET(unfd, &rset)) {
 			nread = recvfrom(unfd, rbuf, sizeof(rbuf), 0, NULL, NULL);

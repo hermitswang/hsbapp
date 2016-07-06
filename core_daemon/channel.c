@@ -96,5 +96,27 @@ int get_channel(HSB_CHANNEL_DB_T *db, char *name, uint32_t *cid)
 	return HSB_E_OTHERS;
 }
 
+int get_channel_num(HSB_CHANNEL_DB_T *db, int *num)
+{
+	GQueue *queue = &db->queue;
 
+	*num = g_queue_get_length(queue);
+
+	return HSB_E_OK;
+}
+
+int get_channel_by_id(HSB_CHANNEL_DB_T *db, int id, char *name, uint32_t *cid)
+{
+	GQueue *queue = &db->queue;
+	uint32_t len = g_queue_get_length(queue);
+
+	if (id >= len)
+		return HSB_E_BAD_PARAM;
+
+	HSB_CHANNEL_T *pchan = (HSB_CHANNEL_T *)g_queue_peek_nth(queue, id);
+	memcpy(name, pchan->name, sizeof(pchan->name));
+	*cid = pchan->id;
+
+	return HSB_E_OK;
+}
 

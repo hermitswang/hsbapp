@@ -280,6 +280,42 @@ int get_dev_channel(uint32_t devid, char *name, uint32_t *cid)
 	return get_channel(pdb, name, cid);
 }
 
+int get_dev_channel_num(uint32_t devid, int *num)
+{
+	HSB_DEV_T *pdev = find_dev(devid);
+
+	if (!pdev)
+		return HSB_E_BAD_PARAM;
+
+	HSB_CHANNEL_DB_T *pdb = NULL;
+
+	if (pdev->op && pdev->op->get_channel_db)
+		pdev->op->get_channel_db(pdev, &pdb);
+
+	if (!pdb)
+		return HSB_E_NOT_SUPPORTED;
+
+	return get_channel_num(pdb, num);
+}
+
+int get_dev_channel_by_id(uint32_t devid, int id, char *name, uint32_t *cid)
+{
+	HSB_DEV_T *pdev = find_dev(devid);
+
+	if (!pdev)
+		return HSB_E_BAD_PARAM;
+
+	HSB_CHANNEL_DB_T *pdb = NULL;
+
+	if (pdev->op && pdev->op->get_channel_db)
+		pdev->op->get_channel_db(pdev, &pdb);
+
+	if (!pdb)
+		return HSB_E_NOT_SUPPORTED;
+
+
+	return get_channel_by_id(pdb, id, name, cid);
+}
 
 static HSB_DEV_DRV_T *_get_dev_drv(uint32_t devid)
 {
@@ -661,6 +697,8 @@ int dev_online(uint32_t drvid,
 		HSB_DEVICE_CB_UNLOCK();
 
 		dev_updated(pdev->id, HSB_DEV_UPDATED_TYPE_NEW_ADD, pdev->info.dev_type);
+
+		hsb_debug("device newadd %d\n", pdev->id);
 	} else {
 		g_queue_pop_nth(offq, id);
 
@@ -674,6 +712,8 @@ int dev_online(uint32_t drvid,
 		update_link(pdev);
 
 		dev_updated(pdev->id, HSB_DEV_UPDATED_TYPE_ONLINE, pdev->info.dev_type);
+
+		hsb_debug("device online %d\n", pdev->id);
 	}
 
 	*devid = pdev->id;

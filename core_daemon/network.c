@@ -95,6 +95,17 @@ static int _reply_get_device_cfg(uint8_t *buf, uint32_t dev_id, HSB_DEV_CONFIG_T
 	return len;
 }
 
+static int _reply_get_device_channel(uint8_t *buf, uint32_t dev_id, char *name, uint32_t cid)
+{
+	int len = 12 + HSB_CHANNEL_MAX_NAME_LEN;
+	MAKE_CMD_HDR(buf, HSB_CMD_GET_CHANNEL_RESP, len);
+	SET_CMD_FIELD(buf, 4, uint32_t, dev_id); /* device id */
+	memcpy(buf + 8, name, HSB_CHANNEL_MAX_NAME_LEN);
+	SET_CMD_FIELD(buf, 8 + HSB_CHANNEL_MAX_NAME_LEN, uint32_t, cid);
+
+	return len;
+}
+
 /*
 static int _reply_get_device_status(uint8_t *buf, uint32_t dev_id, HSB_STATUS_T *status, int num)
 {
@@ -432,6 +443,36 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			status.val[0] = cid;
 
 			ret = set_dev_status_async(&status, reply);
+
+			rlen = 0;
+
+			break;
+		}
+		case HSB_CMD_GET_CHANNEL:
+		{
+			uint32_t devid = GET_CMD_FIELD(buf, 4, uint32_t);
+
+			uint32_t id, num = 0;
+			ret = get_dev_channel_num(devid, &num);
+			if (HSB_E_OK != ret) {
+				rlen = _reply_result(reply_buf, ret, devid, cmd);
+				break;
+			}
+
+			char name[HSB_CHANNEL_MAX_NAME_LEN];
+			uint32_t cid;
+
+			for (id = 0; id < num; id++) {
+				ret = get_dev_channel_by_id(devid, id, name, &cid);
+				if (HSB_E_OK != ret)
+					continue;
+
+				rlen = _reply_get_device_channel(reply_buf, devid, name, cid);
+				if (rlen > 0) {
+					struct timeval tv = { 1, 0 };
+					ret = write_timeout(fd, reply_buf, rlen, &tv);
+				}
+			}
 
 			rlen = 0;
 
@@ -935,7 +976,7 @@ static void tcp_client_handler(gpointer data, gpointer user_data)
 
 		if (FD_ISSET(unfd, &readset)) {
 			nread = recvfrom(unfd, msg, sizeof(msg), 0, NULL, NULL);
-			hsb_debug("get notify\n");
+			//hsb_debug("get notify\n");
 
 			_process_notify(sockfd, pctx);
 		}

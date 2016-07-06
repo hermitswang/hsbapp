@@ -22,4 +22,7 @@ int del_channel(HSB_CHANNEL_DB_T *db, char *name);
 int get_channel(HSB_CHANNEL_DB_T *db, char *name, uint32_t *cid);
 
 
+int get_channel_num(HSB_CHANNEL_DB_T *db, int *num);
+int get_channel_by_id(HSB_CHANNEL_DB_T *db, int id, char *name, uint32_t *cid);
+
 #endif /* _CHANNEL_H_ */
