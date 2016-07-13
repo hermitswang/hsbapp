@@ -509,7 +509,7 @@ int probe_dev(uint32_t drv_id)
 	return HSB_E_OK;
 }
 
-int add_dev(uint32_t drv_id, HSB_DEV_TYPE_T dev_type)
+int add_dev(uint32_t drv_id, HSB_DEV_TYPE_T dev_type, HSB_DEV_CONFIG_T *cfg)
 {
 	HSB_DEV_DRV_T *pdrv = _find_drv(drv_id);
 
@@ -517,7 +517,23 @@ int add_dev(uint32_t drv_id, HSB_DEV_TYPE_T dev_type)
 		return HSB_E_BAD_PARAM;
 
 	if (pdrv->op && pdrv->op->add_dev)
-		return pdrv->op->add_dev(dev_type);
+		return pdrv->op->add_dev(dev_type, cfg);
+
+	return HSB_E_NOT_SUPPORTED;
+}
+
+int del_dev(uint32_t devid)
+{
+	HSB_DEV_T *pdev = find_dev(devid);
+	if (!pdev)
+		return HSB_E_BAD_PARAM;
+
+	HSB_DEV_DRV_T *pdrv = pdev->driver;
+	if (!pdrv)
+		return HSB_E_BAD_PARAM;
+
+	if (pdrv->op && pdrv->op->del_dev)
+		return pdrv->op->del_dev(devid);
 
 	return HSB_E_NOT_SUPPORTED;
 }
@@ -650,6 +666,7 @@ int dev_online(uint32_t drvid,
 		HSB_DEV_INFO_T *info,
 		HSB_DEV_STATUS_T *status,
 		HSB_DEV_OP_T *op,
+		HSB_DEV_CONFIG_T *cfg,
 		void *priv,
 		uint32_t *devid)
 {
@@ -687,10 +704,14 @@ int dev_online(uint32_t drvid,
 		memcpy(&pdev->status, status, sizeof(*status));
 		memcpy(&pdev->info, info, sizeof(*info));
 
-		HSB_DEV_CONFIG_T config;
-		get_default_config(info->dev_type, &config);
+		if (!cfg) {
+			HSB_DEV_CONFIG_T config;
+			get_default_config(info->dev_type, &config);
 
-		memcpy(&pdev->config, &config, sizeof(config));
+			memcpy(&pdev->config, &config, sizeof(config));
+		} else {
+			memcpy(&pdev->config, cfg, sizeof(*cfg));
+		}
 
 		HSB_DEVICE_CB_LOCK();
 		g_queue_push_tail(queue, pdev);
@@ -760,6 +781,48 @@ int dev_offline(uint32_t devid)
 	update_link(pdev);
 
 	dev_updated(devid, HSB_DEV_UPDATED_TYPE_OFFLINE, pdev->info.dev_type);
+
+	return ret;
+}
+
+int dev_removed(uint32_t devid)
+{
+	int ret = HSB_E_OK;
+	GQueue *queue = &gl_dev_cb.queue;
+	HSB_DEV_T *pdev = NULL;
+	guint len, id;
+
+	HSB_DEVICE_CB_LOCK();
+
+	len = g_queue_get_length(queue);
+	for (id = 0; id < len; id++) {
+		pdev = (HSB_DEV_T *)g_queue_peek_nth(queue, id);
+		if (!pdev) {
+			hsb_critical("device null\n");
+			continue;
+		}
+
+		if (pdev->id == devid)
+			break;
+	}
+
+	if (id == len) {
+		hsb_critical("dev %d not found in queue\n", devid);
+		HSB_DEVICE_CB_UNLOCK();
+		return HSB_E_OTHERS;
+	}
+
+	pdev->state = HSB_DEV_STATE_OFFLINE;
+
+	g_queue_pop_nth(queue, id);
+
+	HSB_DEVICE_CB_UNLOCK();
+
+	update_link(pdev);
+
+	dev_updated(devid, HSB_DEV_UPDATED_TYPE_OFFLINE, pdev->info.dev_type);
+
+	destroy_dev(pdev);
 
 	return ret;
 }

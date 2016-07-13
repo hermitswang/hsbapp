@@ -304,11 +304,18 @@ static int deal_input_cmd(int fd, void *buf, size_t count)
 		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
 		SET_CMD_FIELD(rbuf, 4, uint16_t, val1);
 	} else if (1 == sscanf(buf, "adddev %d", &val1)) {
-		len = 8;
+		len = 40;
 		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_ADD_DEV);
 		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
 		SET_CMD_FIELD(rbuf, 4, uint16_t, 3);
 		SET_CMD_FIELD(rbuf, 6, uint16_t, val1);
+		strcpy(rbuf + 8, "unknown");
+		strcpy(rbuf + 24, "unknown");
+	} else if (1 == sscanf(buf, "deldev %d", &val1)) {
+		len = 8;
+		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_DEL_DEV);
+		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
+		SET_CMD_FIELD(rbuf, 4, uint32_t, val1);
 	} else if (3 == sscanf(buf, "set config %d %s %s", &val1, name, location)) {
 		len = 40;
 		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_SET_CONFIG);

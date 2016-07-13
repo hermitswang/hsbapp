@@ -410,7 +410,7 @@ static int _register_device(struct in_addr *addr, VS_INFO_T *info)
 	dev_info.dev_type = info->dev_type;
 	memcpy(dev_info.mac, info->mac, 6);
 
-	int ret = dev_online(virtual_switch_drv.id, &dev_info, &status, &virtual_switch_op, NULL, &devid);
+	int ret = dev_online(virtual_switch_drv.id, &dev_info, &status, &virtual_switch_op, NULL, NULL, &devid);
 	if (HSB_E_OK != ret)
 		return ret;
 

@@ -158,7 +158,7 @@ static int cc9201_get_channel_db(HSB_DEV_T *pdev, HSB_CHANNEL_DB_T **pdb)
 	return HSB_E_OK;
 }
 
-static int ir_add_dev(HSB_DEV_TYPE_T ir_type)
+static int ir_add_dev(HSB_DEV_TYPE_T ir_type, HSB_DEV_CONFIG_T *cfg)
 {
 	uint32_t devid;
 	HSB_DEV_INFO_T dev_info = { 0 };
@@ -199,11 +199,32 @@ static int ir_add_dev(HSB_DEV_TYPE_T ir_type)
 			return ret;
 	}
 
-	ret = dev_online(ir_drv.id, &dev_info, &status, op, priv, &devid);
+	ret = dev_online(ir_drv.id, &dev_info, &status, op, cfg, priv, &devid);
 	if (HSB_E_OK != ret)
 		return ret;
 
 	return HSB_E_OK;
+}
+
+static int ir_del_dev(uint32_t devid)
+{
+	int ret = HSB_E_OK;
+	HSB_DEV_T *pdev = find_dev(devid);
+
+	if (!pdev)
+		return HSB_E_OTHERS;
+
+	HSB_DEV_OP_T *op = pdev->op;
+	if (!op)
+		return HSB_E_NOT_SUPPORTED;
+
+	if (op->release) {
+		ret = op->release(pdev->priv_data);
+		if (ret != HSB_E_OK)
+			return ret;
+	}
+
+	return dev_removed(devid);
 }
 
 static HSB_DEV_OP_T cc9201_op = {
@@ -283,6 +304,7 @@ static HSB_DEV_OP_T gree_op = {
 static HSB_DEV_DRV_OP_T ir_drv_op = {
 	NULL,
 	ir_add_dev,
+	ir_del_dev,
 };
 
 static HSB_DEV_DRV_T ir_drv = {

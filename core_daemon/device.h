@@ -75,6 +75,35 @@ typedef struct {
 	} u;
 } HSB_RESP_T;
 
+#define HSB_DEV_MAX_TIMER_NUM		(32)
+#define HSB_DEV_MAX_DELAY_NUM		(8)
+#define HSB_DEV_MAX_LINKAGE_NUM		(8)
+#define HSB_DEV_MAX_NAME_LEN		(16)
+#define HSB_DEV_MAX_LOCATION_LEN	(16)
+
+typedef struct {
+	uint16_t	num;
+	uint16_t	val[8];
+} HSB_DEV_STATUS_T;
+
+typedef struct {
+	HSB_DEV_CLASS_T		cls;
+	uint32_t		interface;
+	uint32_t		dev_type;
+	uint8_t			mac[8];
+} HSB_DEV_INFO_T;
+
+typedef struct {
+	char			name[HSB_DEV_MAX_NAME_LEN];
+	char			location[HSB_DEV_MAX_LOCATION_LEN];
+} HSB_DEV_CONFIG_T;
+
+typedef enum {
+	HSB_DEV_STATE_UNINIT = 0,
+	HSB_DEV_STATE_ONLINE,
+	HSB_DEV_STATE_OFFLINE,
+} HSB_DEV_STATE_T;
+
 struct _HSB_DEV_T;
 struct _HSB_DEV_DRV_T;
 
@@ -89,7 +118,8 @@ typedef struct {
 
 typedef struct {
 	int (*probe)(void);
-	int (*add_dev)(HSB_DEV_TYPE_T dev_type);
+	int (*add_dev)(HSB_DEV_TYPE_T dev_type, HSB_DEV_CONFIG_T *cfg);
+	int (*del_dev)(uint32_t devid);
 } HSB_DEV_DRV_OP_T;
 
 typedef struct _HSB_DEV_DRV_T {
@@ -153,35 +183,6 @@ typedef struct {
 	bool		active;
 } HSB_LINKAGE_STATUS_T;
 
-#define HSB_DEV_MAX_TIMER_NUM		(32)
-#define HSB_DEV_MAX_DELAY_NUM		(8)
-#define HSB_DEV_MAX_LINKAGE_NUM		(8)
-#define HSB_DEV_MAX_NAME_LEN		(16)
-#define HSB_DEV_MAX_LOCATION_LEN	(16)
-
-typedef struct {
-	uint16_t	num;
-	uint16_t	val[8];
-} HSB_DEV_STATUS_T;
-
-typedef struct {
-	HSB_DEV_CLASS_T		cls;
-	uint32_t		interface;
-	uint32_t		dev_type;
-	uint8_t			mac[8];
-} HSB_DEV_INFO_T;
-
-typedef struct {
-	char			name[HSB_DEV_MAX_NAME_LEN];
-	char			location[HSB_DEV_MAX_LOCATION_LEN];
-} HSB_DEV_CONFIG_T;
-
-typedef enum {
-	HSB_DEV_STATE_UNINIT = 0,
-	HSB_DEV_STATE_ONLINE,
-	HSB_DEV_STATE_OFFLINE,
-} HSB_DEV_STATE_T;
-
 typedef struct _HSB_DEV_T {
 	uint32_t		id;
 
@@ -232,7 +233,8 @@ int set_action(HSB_DEV_T *pdev, const HSB_ACTION_T *act);
 int get_dev_status_async(uint32_t devid, void *reply);
 int set_dev_status_async(const HSB_STATUS_T *status, void *reply);
 int probe_dev_async(const HSB_PROBE_T *probe, void *reply);
-int add_dev(uint32_t drv_id, HSB_DEV_TYPE_T dev_type);
+int add_dev(uint32_t drv_id, HSB_DEV_TYPE_T dev_type, HSB_DEV_CONFIG_T *cfg);
+int del_dev(uint32_t devid);
 int set_dev_action_async(const HSB_ACTION_T *act, void *reply);
 
 int get_dev_timer(uint32_t dev_id, uint16_t timer_id, HSB_TIMER_T *timer);
@@ -249,8 +251,15 @@ HSB_DEV_T *create_dev(void);
 int destroy_dev(HSB_DEV_T *dev);
 int register_dev(HSB_DEV_T *dev);
 int remove_dev(HSB_DEV_T *dev);
-int dev_online(uint32_t drvid, HSB_DEV_INFO_T *info, HSB_DEV_STATUS_T *status, HSB_DEV_OP_T *op, void *priv, uint32_t *devid);
+int dev_online(uint32_t drvid,
+		HSB_DEV_INFO_T *info,
+		HSB_DEV_STATUS_T *status,
+		HSB_DEV_OP_T *op,
+		HSB_DEV_CONFIG_T *cfg,
+		void *priv,
+		uint32_t *devid);
 int dev_offline(uint32_t devid);
+int dev_removed(uint32_t devid);
 
 int dev_status_updated(uint32_t devid, HSB_STATUS_T *status);
 int dev_updated(uint32_t devid, HSB_DEV_UPDATED_TYPE_T type, HSB_DEV_TYPE_T dev_type);

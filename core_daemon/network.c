@@ -655,13 +655,26 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 		{
 			uint16_t drvid = GET_CMD_FIELD(buf, 4, uint16_t);
 			uint16_t dev_type = GET_CMD_FIELD(buf, 6, uint16_t);
+			HSB_DEV_CONFIG_T cfg;
+
+			memcpy(&cfg, buf + 8, sizeof(cfg));
 
 			hsb_debug("add_dev: %d,%d\n", drvid, dev_type);
 
-			ret = add_dev(drvid, dev_type);
+			ret = add_dev(drvid, dev_type, &cfg);
 
 			rlen = _reply_result(reply_buf, ret, 0, cmd);
 
+			break;
+		}
+		case HSB_CMD_DEL_DEV:
+		{
+			uint32_t devid = GET_CMD_FIELD(buf, 4, uint32_t);
+
+			ret = del_dev(devid);
+
+			rlen = _reply_result(reply_buf, ret, 0, cmd);
+			
 			break;
 		}
 		default:
