@@ -474,7 +474,8 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 				}
 			}
 
-			rlen = 0;
+			ret = HSB_E_OK;
+			rlen = _reply_result(reply_buf, ret, devid, cmd);
 
 			break;
 		}
