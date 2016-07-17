@@ -717,6 +717,9 @@ int dev_online(uint32_t drvid,
 		g_queue_push_tail(queue, pdev);
 		HSB_DEVICE_CB_UNLOCK();
 
+		link_device(pdev);
+		update_link(pdev);
+
 		dev_updated(pdev->id, HSB_DEV_UPDATED_TYPE_NEW_ADD, pdev->info.dev_type);
 
 		hsb_debug("device newadd %d\n", pdev->id);
@@ -730,6 +733,7 @@ int dev_online(uint32_t drvid,
 
 		memcpy(&pdev->status, status, sizeof(*status));
 
+		link_device(pdev);
 		update_link(pdev);
 
 		dev_updated(pdev->id, HSB_DEV_UPDATED_TYPE_ONLINE, pdev->info.dev_type);
