@@ -1220,11 +1220,6 @@ int get_dev_timer(uint32_t dev_id, uint16_t timer_id, HSB_TIMER_T *timer)
 	HSB_TIMER_T *tm = &dev->timer[timer_id];
 	HSB_TIMER_STATUS_T *status = &dev->timer_status[timer_id];
 
-	if (!status->active) {
-		ret = HSB_E_BAD_PARAM;
-		goto _out;
-	}
-
 	memcpy(timer, tm, sizeof(*tm));
 
 _out:
@@ -1280,11 +1275,6 @@ int del_dev_timer(uint32_t dev_id, uint16_t timer_id)
 
 	HSB_TIMER_T *tm = &dev->timer[timer_id];
 	HSB_TIMER_STATUS_T *status = &dev->timer_status[timer_id];
-
-	if (!status->active) {
-		ret = HSB_E_BAD_PARAM;
-		goto _out;
-	}
 
 	memset(tm, 0, sizeof(*tm));
 	memset(status, 0, sizeof(*status));
@@ -1477,6 +1467,26 @@ _out:
 	return ret;
 }
 
+static int compare_date(HSB_TIMER_T *ptimer, struct tm *tm_now)
+{
+	if (ptimer->year == 0 &&
+		ptimer->mon == 0 &&
+		ptimer->mday == 0)
+	{
+		return -1;
+	}
+
+	
+	if (tm_now->tm_year == ptimer->year &&
+		tm_now->tm_mon == ptimer->mon &&
+		tm_now->tm_mday == ptimer->mday)
+	{
+		return 0;
+	}
+
+	return 1;
+}
+
 static void _check_dev_timer_and_delay(void *data, void *user_data)
 {
 	HSB_DEV_T *pdev = (HSB_DEV_T *)data;
@@ -1494,7 +1504,7 @@ static void _check_dev_timer_and_delay(void *data, void *user_data)
 	uint32_t sec_today = tm_now.tm_hour * 3600 + tm_now.tm_min * 60 + tm_now.tm_sec;
 	uint32_t sec_timer;
 	bool bnextday = false;
-	int cnt;
+	int cnt, ret;
 	uint8_t flag, weekday;
 	HSB_TIMER_T *ptimer = pdev->timer;
 	HSB_TIMER_STATUS_T *tstatus = pdev->timer_status;
@@ -1508,11 +1518,18 @@ static void _check_dev_timer_and_delay(void *data, void *user_data)
 			if (!tstatus->active)
 				continue;
 
-			weekday = ptimer->wday;
-			if (!CHECK_BIT(weekday, tm_now.tm_wday))
-				tstatus->expired = true;
-			else
+			ret = compare_date(ptimer, &tm_now);
+			if (0 == ret) {
 				tstatus->expired = false;
+			} else if (1 == ret) {
+				tstatus->expired = true;
+			} else if (-1 == ret) {
+				weekday = ptimer->wday;
+				if (!CHECK_BIT(weekday, tm_now.tm_wday))
+					tstatus->expired = true;
+				else
+					tstatus->expired = false;
+			}
 		}
 	}
 
@@ -1536,7 +1553,14 @@ static void _check_dev_timer_and_delay(void *data, void *user_data)
 		/* 3.check flag & weekday */
 		flag = ptimer->flag;
 		weekday = ptimer->wday;
-		if (!CHECK_BIT(weekday, tm_now.tm_wday)) {
+		ret = compare_date(ptimer, &tm_now);
+
+		if (-1 == ret) {
+			if (!CHECK_BIT(weekday, tm_now.tm_wday)) {
+				continue;
+			}
+		} else if (1 == ret) {
+			tstatus->expired = true;
 			continue;
 		}
 
@@ -1564,8 +1588,9 @@ static void _check_dev_timer_and_delay(void *data, void *user_data)
 		}
 
 		if (CHECK_BIT(weekday, 7)) { /* One shot */
-			memset(ptimer, 0, sizeof(*ptimer));
-			memset(tstatus, 0, sizeof(*tstatus));
+			//memset(ptimer, 0, sizeof(*ptimer));
+			tstatus->active = false;
+			tstatus->expired = true;
 			continue;
 		}
 

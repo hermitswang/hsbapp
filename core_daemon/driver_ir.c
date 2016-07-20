@@ -277,7 +277,15 @@ static int gree_set_status(const HSB_STATUS_T *status)
 	act.param1 = HSB_IR_PROTOCOL_TYPE_GREE;
 	act.param2 = *(uint32_t *)data;
 
-	return set_action(irdev, &act);
+	int ret = set_action(irdev, &act);
+	if (HSB_E_OK != ret) {
+		hsb_debug("set action fail ret=%d\n", ret);
+		return ret;
+	}
+
+	dev_status_updated(pdev->id, (HSB_STATUS_T *)status);
+
+	return ret;
 }
 
 static int gree_get_status(HSB_STATUS_T *status)

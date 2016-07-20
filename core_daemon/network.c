@@ -126,7 +126,7 @@ static int _reply_get_device_status(uint8_t *buf, uint32_t dev_id, HSB_STATUS_T 
 
 static int  _reply_get_timer(uint8_t *buf, uint32_t dev_id, HSB_TIMER_T *tm)
 {
-	int len = 24;
+	int len = 28;
 	
 	MAKE_CMD_HDR(buf, HSB_CMD_GET_TIMER_RESP, len);
 
@@ -138,9 +138,12 @@ static int  _reply_get_timer(uint8_t *buf, uint32_t dev_id, HSB_TIMER_T *tm)
 	SET_CMD_FIELD(buf, 13, uint8_t, tm->min);
 	SET_CMD_FIELD(buf, 14, uint8_t, tm->sec);
 	SET_CMD_FIELD(buf, 15, uint8_t, tm->wday);
-	SET_CMD_FIELD(buf, 16, uint16_t, tm->act_id);
-	SET_CMD_FIELD(buf, 18, uint16_t, tm->act_param1);
-	SET_CMD_FIELD(buf, 20, uint32_t, tm->act_param2);
+	SET_CMD_FIELD(buf, 16, uint16_t, tm->year);
+	SET_CMD_FIELD(buf, 18, uint8_t, tm->mon);
+	SET_CMD_FIELD(buf, 19, uint8_t, tm->mday);
+	SET_CMD_FIELD(buf, 20, uint16_t, tm->act_id);
+	SET_CMD_FIELD(buf, 22, uint16_t, tm->act_param1);
+	SET_CMD_FIELD(buf, 24, uint32_t, tm->act_param2);
 
 	return len;
 }
@@ -463,6 +466,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			uint32_t cid;
 
 			for (id = 0; id < num; id++) {
+				memset(name, 0, sizeof(name));
 				ret = get_dev_channel_by_id(devid, id, name, &cid);
 				if (HSB_E_OK != ret)
 					continue;
@@ -506,9 +510,12 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			tm.min = GET_CMD_FIELD(buf, 13, uint8_t);
 			tm.sec = GET_CMD_FIELD(buf, 14, uint8_t);
 			tm.wday = GET_CMD_FIELD(buf, 15, uint8_t);
-			tm.act_id = GET_CMD_FIELD(buf, 16, uint16_t);
-			tm.act_param1 = GET_CMD_FIELD(buf, 18, uint16_t);
-			tm.act_param2 = GET_CMD_FIELD(buf, 20, uint32_t);
+			tm.year = GET_CMD_FIELD(buf, 16, uint16_t);
+			tm.mon = GET_CMD_FIELD(buf, 18, uint8_t);
+			tm.mday = GET_CMD_FIELD(buf, 19, uint8_t);
+			tm.act_id = GET_CMD_FIELD(buf, 20, uint16_t);
+			tm.act_param1 = GET_CMD_FIELD(buf, 22, uint16_t);
+			tm.act_param2 = GET_CMD_FIELD(buf, 24, uint32_t);
 
 			ret = set_dev_timer(dev_id, &tm);
 			if (ret)

@@ -133,6 +133,9 @@ typedef struct _HSB_TIMER_T {
 	uint16_t	id;
 	uint8_t		work_mode;
 	uint8_t		flag;
+	uint16_t	year;
+	uint8_t		mon;
+	uint8_t		mday;
 	uint8_t		hour;
 	uint8_t		min;
 	uint8_t		sec;

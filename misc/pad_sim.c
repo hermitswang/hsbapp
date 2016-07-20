@@ -68,7 +68,7 @@ static int deal_tcp_pkt(int fd, void *buf, size_t count, int *used)
 			strncpy(name, buf + 8, sizeof(name));
 			cid = GET_CMD_FIELD(buf, 24, uint32_t);
 
-			printf("channel[%s]=%d\n", name, cid);
+			printf("channel[%s, %d]=%d\n", name, strlen(name), cid);
 			break;
 		}
 		case HSB_CMD_GET_STATUS_RESP:
