@@ -138,8 +138,17 @@ static int  _reply_get_timer(uint8_t *buf, uint32_t dev_id, HSB_TIMER_T *tm)
 	SET_CMD_FIELD(buf, 13, uint8_t, tm->min);
 	SET_CMD_FIELD(buf, 14, uint8_t, tm->sec);
 	SET_CMD_FIELD(buf, 15, uint8_t, tm->wday);
-	SET_CMD_FIELD(buf, 16, uint16_t, tm->year);
-	SET_CMD_FIELD(buf, 18, uint8_t, tm->mon);
+	int year = 0, mon = 0;
+	if (tm->year > 0) {
+		year = tm->year + 1900;
+		mon = tm->mon + 1;
+	}
+
+	hsb_debug("get year %d mon %d\n", year, mon);
+	hsb_debug("tm->year %d tm->mon %d\n", tm->year, tm->mon);
+
+	SET_CMD_FIELD(buf, 16, uint16_t, year);
+	SET_CMD_FIELD(buf, 18, uint8_t, mon);
 	SET_CMD_FIELD(buf, 19, uint8_t, tm->mday);
 	SET_CMD_FIELD(buf, 20, uint16_t, tm->act_id);
 	SET_CMD_FIELD(buf, 22, uint16_t, tm->act_param1);
@@ -510,12 +519,32 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			tm.min = GET_CMD_FIELD(buf, 13, uint8_t);
 			tm.sec = GET_CMD_FIELD(buf, 14, uint8_t);
 			tm.wday = GET_CMD_FIELD(buf, 15, uint8_t);
-			tm.year = GET_CMD_FIELD(buf, 16, uint16_t);
-			tm.mon = GET_CMD_FIELD(buf, 18, uint8_t);
+			int year, mon;
+			year = GET_CMD_FIELD(buf, 16, uint16_t);
+			mon = GET_CMD_FIELD(buf, 18, uint8_t);
+
+			hsb_debug("set year %d mon %d\n", year, mon);
+
+			if (year > 1900) {
+				year -= 1900;
+				mon -= 1;
+			}
+
+			tm.year = year;
+			tm.mon = mon;
+
+
+			hsb_debug("tm->year %d tm->mon %d\n", tm.year, tm.mon);
+
 			tm.mday = GET_CMD_FIELD(buf, 19, uint8_t);
 			tm.act_id = GET_CMD_FIELD(buf, 20, uint16_t);
 			tm.act_param1 = GET_CMD_FIELD(buf, 22, uint16_t);
 			tm.act_param2 = GET_CMD_FIELD(buf, 24, uint32_t);
+
+			hsb_debug("set timer %d, %d/%d/%d %d:%d:%d\n", timer_id,
+				tm.year, tm.mon, tm.mday, tm.hour, tm.min, tm.sec);
+
+			hsb_debug("devid %d, actid %d, param1 %d\n", dev_id, tm.act_id, tm.act_param1);
 
 			ret = set_dev_timer(dev_id, &tm);
 			if (ret)

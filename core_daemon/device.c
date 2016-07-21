@@ -1487,6 +1487,7 @@ static int compare_date(HSB_TIMER_T *ptimer, struct tm *tm_now)
 	return 1;
 }
 
+
 static void _check_dev_timer_and_delay(void *data, void *user_data)
 {
 	HSB_DEV_T *pdev = (HSB_DEV_T *)data;
@@ -1515,7 +1516,9 @@ static void _check_dev_timer_and_delay(void *data, void *user_data)
 		bnextday = true;
 		
 		for (cnt = 0; cnt < HSB_DEV_MAX_TIMER_NUM; cnt++, ptimer++, tstatus++) {
-			if (!tstatus->active)
+			flag = ptimer->flag;
+			//if (!tstatus->active)
+			if (!CHECK_BIT(flag, 1))
 				continue;
 
 			ret = compare_date(ptimer, &tm_now);
@@ -1542,8 +1545,10 @@ static void _check_dev_timer_and_delay(void *data, void *user_data)
 	tstatus = pdev->timer_status;
 
 	for (cnt = 0; cnt < HSB_DEV_MAX_TIMER_NUM; cnt++, ptimer++, tstatus++) {
+		flag = ptimer->flag;
 		/* 1.chekc active & expired */
-		if (!tstatus->active || tstatus->expired)
+		//if (!tstatus->active || tstatus->expired)
+		if (!CHECK_BIT(flag, 1) || tstatus->expired)
 			continue;
 
 		/* 2.check work mode */
@@ -1551,7 +1556,6 @@ static void _check_dev_timer_and_delay(void *data, void *user_data)
 			continue;
 
 		/* 3.check flag & weekday */
-		flag = ptimer->flag;
 		weekday = ptimer->wday;
 		ret = compare_date(ptimer, &tm_now);
 
@@ -1586,6 +1590,8 @@ static void _check_dev_timer_and_delay(void *data, void *user_data)
 			stat.val[0] = ptimer->act_param1;
 			set_dev_status_async(&stat, NULL);
 		}
+
+		hsb_debug("timer expired\n");
 
 		if (CHECK_BIT(weekday, 7)) { /* One shot */
 			//memset(ptimer, 0, sizeof(*ptimer));
