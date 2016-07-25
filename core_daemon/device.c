@@ -8,6 +8,7 @@
 #include "hsb_error.h"
 #include "hsb_config.h"
 #include "thread_utils.h"
+#include "scene.h"
 
 typedef struct {
 	GQueue			queue;
@@ -1185,6 +1186,8 @@ int init_dev_module(void)
 	g_mutex_init(&gl_dev_cb.mutex);
 	g_queue_init(&gl_dev_cb.driverq);
 	g_queue_init(&gl_dev_cb.offq);
+
+	init_scene();
 
 	/* reserve hsb id=0 */
 	gl_dev_cb.dev_id = 1;

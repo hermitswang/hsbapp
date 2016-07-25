@@ -15,6 +15,7 @@
 #include "network.h"
 #include "network_utils.h"
 #include "net_protocol.h"
+#include "scene.h"
 
 #define MAKE_CMD_HDR(_buf, _cmd, _len)	do { \
 	SET_CMD_FIELD(_buf, 0, uint16_t, _cmd); \
@@ -196,6 +197,14 @@ static int  _reply_get_linkage(uint8_t *buf, uint32_t dev_id, HSB_LINKAGE_T *lin
 	SET_CMD_FIELD(buf, 26, uint16_t, link->act_param1);
 	SET_CMD_FIELD(buf, 28, uint32_t, link->act_param2);
 
+	return len;
+}
+
+
+static int _reply_get_scene(uint8_t *buf, HSB_SCENE_T *scene)
+{
+	int len = 0;
+	// TODO
 	return len;
 }
 
@@ -713,6 +722,70 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			
 			break;
 		}
+		case HSB_CMD_SET_SCENE:
+		{
+			// TODO
+			/* alloc_scene */
+
+			/* set scene */
+
+			/* add_scene */
+			break;
+		}
+		case HSB_CMD_DEL_SCENE:
+		{
+			char name[HSB_SCENE_MAX_NAME_LEN];
+
+			strncpy(name, buf + 4, sizeof(name));
+
+			ret = del_scene(name);
+
+			rlen = _reply_result(reply_buf, ret, 0, cmd);
+
+			break;
+		}
+		case HSB_CMD_ENTER_SCENE:
+		{
+			char name[HSB_SCENE_MAX_NAME_LEN];
+
+			strncpy(name, buf + 4, sizeof(name));
+
+			ret = enter_scene(name);
+
+			rlen = _reply_result(reply_buf, ret, 0, cmd);
+
+			break;
+		}
+		case HSB_CMD_GET_SCENE:
+		{
+			uint32_t id, num = 0;
+			ret = get_scene_num(&num);
+			if (HSB_E_OK != ret) {
+				rlen = _reply_result(reply_buf, ret, 0, cmd);
+				break;
+			}
+
+			char name[HSB_SCENE_MAX_NAME_LEN];
+			HSB_SCENE_T *scene = NULL;
+
+			for (id = 0; id < num; id++) {
+				memset(name, 0, sizeof(name));
+				ret = get_scene(id, &scene);
+				if (HSB_E_OK != ret)
+					continue;
+
+				rlen = _reply_get_scene(reply_buf, scene);
+				if (rlen > 0) {
+					struct timeval tv = { 1, 0 };
+					ret = write_timeout(fd, reply_buf, rlen, &tv);
+				}
+			}
+
+			ret = HSB_E_OK;
+			rlen = _reply_result(reply_buf, ret, 0, cmd);
+
+			break;
+		}
 		default:
 			rlen = _reply_result(reply_buf, REPLY_FAIL, 0, cmd);
 			break;
@@ -1098,6 +1171,8 @@ int notify_resp(HSB_RESP_T *msg, void *data)
 		unix_socket_send_to(fd, pctx->listen_path, NOTIFY_MESSAGE, strlen(NOTIFY_MESSAGE));
 		unix_socket_free(fd);
 	}
+
+	return HSB_E_OK;
 }
 
 int init_network_module(void)

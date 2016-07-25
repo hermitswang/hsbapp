@@ -23,6 +23,7 @@
 #define CHECK_BIT(a, b)		(a & (1 << b))
 
 #define HSB_CHANNEL_MAX_NAME_LEN	(16)
+#define HSB_SCENE_MAX_NAME_LEN		(16)
 
 typedef struct {
 	char *pid_file ;

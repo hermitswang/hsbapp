@@ -372,7 +372,7 @@ static int _remove_timeout_dev(void)
 			dev_offline(pdev->id);
 
 			g_queue_pop_nth(queue, id);
-			hsb_debug("device offline %s\n", inet_ntoa(pdev->ip));
+			//hsb_debug("device offline %s\n", inet_ntoa(pdev->ip));
 			g_slice_free(VS_DEV_T, pdev);
 
 			continue;
