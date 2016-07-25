@@ -200,12 +200,119 @@ static int  _reply_get_linkage(uint8_t *buf, uint32_t dev_id, HSB_LINKAGE_T *lin
 	return len;
 }
 
+static int parse_scene(HSB_SCENE_T *scene, uint8_t *buf, int len)
+{
+	int action_cnt = 0;
+	int id, offset = 4;
+	strncpy(scene->name, buf + offset, HSB_SCENE_MAX_NAME_LEN);
+	offset += HSB_SCENE_MAX_NAME_LEN;
+
+	HSB_SCENE_ACTION_T *paction = &scene->actions[0];
+	HSB_SCENE_CONDITION_T *pcond = NULL;
+	HSB_SCENE_ACT_T *pact = NULL;
+
+	while (offset < len) {
+		if (buf[offset] != 0xFF)
+			return HSB_E_INVALID_MSG;
+
+		paction->delay = buf[offset + 1];
+		paction->has_cond = buf[offset + 2] > 0 ? true : false;
+		paction->act_num = buf[offset + 3];
+		offset += 4;
+
+		if (paction->has_cond) {
+			pcond = &paction->condition;
+			if (buf[offset] != 0xFE)
+				return HSB_E_INVALID_MSG;
+
+			pcond->expr = buf[offset + 1];
+			pcond->devid = GET_CMD_FIELD(buf, offset + 2, uint16_t);
+			pcond->id = GET_CMD_FIELD(buf, offset + 4, uint16_t);
+			pcond->val = GET_CMD_FIELD(buf, offset + 6, uint16_t);
+			offset += 8;
+		}
+
+		pact = &paction->acts[0];
+		for (id = 0; id < paction->act_num; id++)
+		{
+			if (buf[offset] != 0xFD)
+				return HSB_E_INVALID_MSG;
+
+			pact->flag = buf[offset + 1];
+			pact->devid = GET_CMD_FIELD(buf, offset + 2, uint16_t);
+			pact->id = GET_CMD_FIELD(buf, offset + 4, uint16_t);
+			pact->param1 = GET_CMD_FIELD(buf, offset + 6, uint16_t);
+			pact->param2 = GET_CMD_FIELD(buf, offset + 8, uint32_t);
+			offset += 12;
+			pact++;
+		}
+
+		paction++;
+		action_cnt++;
+		if (action_cnt == 8)
+			break;
+	}
+
+	if (offset != len)
+		hsb_debug("paser_scene error, offset=%d len=%d\n", offset, len);
+
+	scene->act_num = action_cnt;
+
+	return HSB_E_OK;
+}
 
 static int _reply_get_scene(uint8_t *buf, HSB_SCENE_T *scene)
 {
-	int len = 0;
-	// TODO
-	return len;
+	int offset = 0;
+	int id = 0, index = 0;
+
+	SET_CMD_FIELD(buf, 0, uint16_t, HSB_CMD_SCENE_UPDATE);
+	strncpy(buf + 4, scene->name, HSB_SCENE_MAX_NAME_LEN);
+	offset = 4 + HSB_SCENE_MAX_NAME_LEN;
+
+	HSB_SCENE_ACTION_T *paction = &scene->actions[0];
+	HSB_SCENE_CONDITION_T *pcond = NULL;
+	HSB_SCENE_ACT_T *pact = NULL;
+
+	for (id = 0; id < scene->act_num; id++)
+	{
+		buf[offset] = 0xFF;
+		buf[offset + 1] = paction->delay;
+		buf[offset + 2] = paction->has_cond ? 1 : 0;
+		buf[offset + 3] = paction->act_num;
+		offset += 4;
+
+		if (paction->has_cond) {
+			pcond = &paction->condition;
+			buf[offset] = 0xFE;
+			buf[offset + 1] = pcond->expr;
+			SET_CMD_FIELD(buf, offset + 2, uint16_t, pcond->devid);
+			SET_CMD_FIELD(buf, offset + 4, uint16_t, pcond->id);
+			SET_CMD_FIELD(buf, offset + 6, uint16_t, pcond->val);
+			offset += 8;
+		}
+
+		for (index = 0; index < paction->act_num; index++)
+		{
+			pact = &paction->acts[index];
+
+			buf[offset] = 0xFD;
+			buf[offset + 1] = pact->flag;
+
+			SET_CMD_FIELD(buf, offset + 2, uint16_t, pact->devid);
+			SET_CMD_FIELD(buf, offset + 4, uint16_t, pact->id);
+			SET_CMD_FIELD(buf, offset + 6, uint16_t, pact->param1);
+			SET_CMD_FIELD(buf, offset + 8, uint32_t, pact->param2);
+			offset += 12;
+		}
+
+		paction++;
+	}
+
+	/* set length */
+	SET_CMD_FIELD(buf, 2, uint16_t, offset);
+
+	return offset;
 }
 
 static int _get_dev_status(uint8_t *buf, int len, HSB_STATUS_T *status)
@@ -724,12 +831,25 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 		}
 		case HSB_CMD_SET_SCENE:
 		{
-			// TODO
 			/* alloc_scene */
+			HSB_SCENE_T *scene = alloc_scene();
+			if (!scene) {
+				ret = HSB_E_NO_MEMORY;
+				rlen = _reply_result(reply_buf, ret, 0, cmd);
+				break;
+			}
 
-			/* set scene */
+			/* parse_scene */
+			ret = parse_scene(scene, buf, cmdlen);
+			if (HSB_E_OK != ret) {
+				rlen = _reply_result(reply_buf, ret, 0, cmd);
+				break;
+			}
 
 			/* add_scene */
+			ret = add_scene(scene);
+			rlen = _reply_result(reply_buf, ret, 0, cmd);
+
 			break;
 		}
 		case HSB_CMD_DEL_SCENE:
@@ -765,11 +885,9 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 				break;
 			}
 
-			char name[HSB_SCENE_MAX_NAME_LEN];
 			HSB_SCENE_T *scene = NULL;
 
 			for (id = 0; id < num; id++) {
-				memset(name, 0, sizeof(name));
 				ret = get_scene(id, &scene);
 				if (HSB_E_OK != ret)
 					continue;

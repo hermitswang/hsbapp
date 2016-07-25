@@ -8,7 +8,7 @@ typedef struct {
 	uint32_t	devid;
 	uint32_t	id;
 	uint32_t	val;
-	uint32_t	expression;
+	uint32_t	expr;
 } HSB_SCENE_CONDITION_T;
 
 typedef struct {

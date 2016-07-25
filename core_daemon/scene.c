@@ -74,6 +74,9 @@ int del_scene(char *name)
 int enter_scene(char *name)
 {
 	// TODO
+
+
+	return HSB_E_OK;
 }
 
 int get_scene_num(uint32_t *num)
