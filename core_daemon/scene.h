@@ -4,6 +4,14 @@
 
 #include "hsb_config.h"
 
+typedef enum {
+	HSB_SCENE_EXPR_EQUAL = 0,
+	HSB_SCENE_EXPR_GT = 1,
+	HSB_SCENE_EXPR_GE = 2,
+	HSB_SCENE_EXPR_LT = 3,
+	HSB_SCENE_EXPR_LE = 4,
+} HSB_SCENE_EXPR_T;
+
 typedef struct {
 	uint32_t	devid;
 	uint32_t	id;
