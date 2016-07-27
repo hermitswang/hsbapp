@@ -97,8 +97,10 @@ int del_scene(char *name)
 int enter_scene(char *name)
 {
 	HSB_SCENE_T *scene = find_scene(name);
-	if (!scene)
+	if (!scene) {
+		hsb_debug("scene [%s] not found\n", name);
 		return HSB_E_BAD_PARAM;
+	}
 
 	HSB_SCENE_T *tmp = alloc_scene();
 	memcpy(tmp, scene, sizeof(*tmp));
@@ -229,7 +231,9 @@ int get_scene_num(uint32_t *num)
 {
 	GQueue *queue = &scene_q;
 
-	return g_queue_get_length(queue);
+	*num = g_queue_get_length(queue);
+
+	return HSB_E_OK;
 }
 
 int get_scene(int id, HSB_SCENE_T **scene)

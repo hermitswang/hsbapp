@@ -11,6 +11,69 @@
 #include <sys/ioctl.h>
 #include "network_utils.h"
 #include "net_protocol.h"
+#include "hsb_error.h"
+#include "scene.h"
+
+static int parse_scene(HSB_SCENE_T *scene, uint8_t *buf, int len)
+{
+	int action_cnt = 0;
+	int id, offset = 4;
+	strncpy(scene->name, buf + offset, HSB_SCENE_MAX_NAME_LEN);
+	offset += HSB_SCENE_MAX_NAME_LEN;
+
+	HSB_SCENE_ACTION_T *paction = &scene->actions[0];
+	HSB_SCENE_CONDITION_T *pcond = NULL;
+	HSB_SCENE_ACT_T *pact = NULL;
+
+	while (offset < len) {
+		if (buf[offset] != 0xFF)
+			return HSB_E_INVALID_MSG;
+
+		paction->delay = buf[offset + 1];
+		paction->has_cond = buf[offset + 2] > 0 ? true : false;
+		paction->act_num = buf[offset + 3];
+		offset += 4;
+
+		if (paction->has_cond) {
+			pcond = &paction->condition;
+			if (buf[offset] != 0xFE)
+				return HSB_E_INVALID_MSG;
+
+			pcond->expr = buf[offset + 1];
+			pcond->devid = GET_CMD_FIELD(buf, offset + 2, uint16_t);
+			pcond->id = GET_CMD_FIELD(buf, offset + 4, uint16_t);
+			pcond->val = GET_CMD_FIELD(buf, offset + 6, uint16_t);
+			offset += 8;
+		}
+
+		pact = &paction->acts[0];
+		for (id = 0; id < paction->act_num; id++)
+		{
+			if (buf[offset] != 0xFD)
+				return HSB_E_INVALID_MSG;
+
+			pact->flag = buf[offset + 1];
+			pact->devid = GET_CMD_FIELD(buf, offset + 2, uint16_t);
+			pact->id = GET_CMD_FIELD(buf, offset + 4, uint16_t);
+			pact->param1 = GET_CMD_FIELD(buf, offset + 6, uint16_t);
+			pact->param2 = GET_CMD_FIELD(buf, offset + 8, uint32_t);
+			offset += 12;
+			pact++;
+		}
+
+		paction++;
+		action_cnt++;
+		if (action_cnt == 8)
+			break;
+	}
+
+	if (offset != len)
+		printf("paser_scene error, offset=%d len=%d\n", offset, len);
+
+	scene->act_num = action_cnt;
+
+	return HSB_E_OK;
+}
 
 static int deal_tcp_pkt(int fd, void *buf, size_t count, int *used)
 {
@@ -218,6 +281,19 @@ static int deal_tcp_pkt(int fd, void *buf, size_t count, int *used)
 
 			break;
 		}
+		case HSB_CMD_SCENE_UPDATE:
+		{
+			HSB_SCENE_T scene = { 0 };
+			int ret = parse_scene(&scene, buf, len);
+
+			if (HSB_E_OK != ret)
+				printf("parse scene faild %d\n", ret);
+			else {
+				printf("scene [%s]\n", scene.name);
+			}
+
+			break;
+		}
 		default:
 		{
 			printf("unknown cmd: %x\n", cmd);
@@ -362,6 +438,40 @@ static int deal_input_cmd(int fd, void *buf, size_t count)
 		SET_CMD_FIELD(rbuf, 12, uint32_t, val4); /* action param2 */
 
 		printf("action devid=%d\n", val1);
+	} else if (1 == sscanf(buf, "del scene %s", name)) {
+		len = 20;
+		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_DEL_SCENE);
+		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
+		strncpy(rbuf + 4, name, sizeof(name));
+		printf("del scene %s\n", name);
+	} else if (1 == sscanf(buf, "enter scene %s", name)) {
+		len = 20;
+		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_ENTER_SCENE);
+		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
+		strncpy(rbuf + 4, name, sizeof(name));
+		printf("enter scene %s\n", name);
+	} else if (0 == strncmp(buf, "get scene", 9)) {
+		len = 4;
+		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_GET_SCENE);
+		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
+	} else if (0 == strncmp(buf, "set scene", 9)) {
+		len = 36;
+		SET_CMD_FIELD(rbuf, 0, uint16_t, HSB_CMD_SET_SCENE);
+		SET_CMD_FIELD(rbuf, 2, uint16_t, len);
+		char *name = "test-scene";
+		strcpy(rbuf + 4, name);
+
+		rbuf[20] = 0xFF;
+		rbuf[21] = 0;
+		rbuf[22] = 0;
+		rbuf[23] = 1;
+
+		rbuf[24] = 0xFD;
+		rbuf[25] = 0;
+		SET_CMD_FIELD(rbuf, 26, uint16_t, 1);  // devid = 1
+		SET_CMD_FIELD(rbuf, 28, uint16_t, 0);
+		SET_CMD_FIELD(rbuf, 30, uint16_t, 12);
+		SET_CMD_FIELD(rbuf, 32, uint32_t, 0);
 	} else {
 		printf("invalid cmd\n");
 		return -1;

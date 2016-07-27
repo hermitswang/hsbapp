@@ -881,6 +881,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			uint32_t id, num = 0;
 			ret = get_scene_num(&num);
 			if (HSB_E_OK != ret) {
+				hsb_debug("get scene num fail\n");
 				rlen = _reply_result(reply_buf, ret, 0, cmd);
 				break;
 			}
