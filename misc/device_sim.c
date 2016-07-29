@@ -13,9 +13,18 @@
 #include "network_utils.h"
 #include "../core_daemon/driver_virtual_switch.h"
 
+// plug status
 static uint16_t status_on_off = 0;
+
+// sensor status
+static uint16_t status_pm25 = 0;
+static uint16_t status_temp = 26;
+static uint16_t status_humi = 50;
+static uint16_t status_gas = 21;
+
 struct sockaddr_in mcastaddr;
 
+static int dev_type = 0;
 uint8_t mac[6] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 };
 
 static int deal_udp_pkt(int fd, uint8_t *buf, size_t count, struct sockaddr *cliaddr, socklen_t clilen)
@@ -39,17 +48,40 @@ static int deal_udp_pkt(int fd, uint8_t *buf, size_t count, struct sockaddr *cli
 		{
 			rlen = 28;
 			SET_CMD_FIELD(rbuf, 0, uint16_t, VS_CMD_DEVICE_DISCOVER_RESP);
-			SET_CMD_FIELD(rbuf, 2, uint16_t, rlen);
 			SET_CMD_FIELD(rbuf, 4, uint8_t, 0);
 			SET_CMD_FIELD(rbuf, 5, uint8_t, 1);
 			SET_CMD_FIELD(rbuf, 8, uint16_t, 4);
 			SET_CMD_FIELD(rbuf, 10, uint16_t, 0);
-			SET_CMD_FIELD(rbuf, 12, uint32_t, 2); // dev_type
+			SET_CMD_FIELD(rbuf, 12, uint32_t, dev_type);
 
 			memcpy(rbuf + 16, mac, 6);
+			rbuf[16] = (uint8_t)(dev_type & 0xFF);
 
-			SET_CMD_FIELD(rbuf, 24, uint16_t, 1);
-			SET_CMD_FIELD(rbuf, 26, uint16_t, status_on_off);
+			switch (dev_type) {
+				case 0: // plug
+					rlen = 28;
+					SET_CMD_FIELD(rbuf, 24, uint16_t, 1);
+					SET_CMD_FIELD(rbuf, 26, uint16_t, status_on_off);
+					break;
+				case 1: // sensor
+					rlen =  24 + 5 * 2;
+					SET_CMD_FIELD(rbuf, 24, uint16_t, 4);
+					SET_CMD_FIELD(rbuf, 26, uint16_t, status_pm25);
+					SET_CMD_FIELD(rbuf, 28, uint16_t, status_temp);
+					SET_CMD_FIELD(rbuf, 30, uint16_t, status_humi);
+					SET_CMD_FIELD(rbuf, 32, uint16_t, status_gas);
+					break;
+				case 2: // remote control
+					rlen = 28;
+					SET_CMD_FIELD(rbuf, 24, uint16_t, 0);
+					SET_CMD_FIELD(rbuf, 26, uint16_t, 0);
+					break;
+				default:
+					printf("unknown device type %d\n", dev_type);
+					break;
+			}
+
+			SET_CMD_FIELD(rbuf, 2, uint16_t, rlen);
 
 			printf("recv cmd: device discover\n");
 			break;
@@ -69,11 +101,34 @@ static int deal_udp_pkt(int fd, uint8_t *buf, size_t count, struct sockaddr *cli
 		}
 		case VS_CMD_GET_STATUS:
 		{
-			rlen = 8;
 			SET_CMD_FIELD(rbuf, 0, uint16_t, VS_CMD_GET_STATUS_RESP);
+
+			switch (dev_type) {
+				case 0: // plug device
+					rlen = 8;
+					SET_CMD_FIELD(rbuf, 4, uint16_t, 0);
+					SET_CMD_FIELD(rbuf, 6, uint16_t, status_on_off);
+					break;
+				case 1: // sensor device
+					rlen = 20;
+					SET_CMD_FIELD(rbuf, 4, uint16_t, 0);
+					SET_CMD_FIELD(rbuf, 6, uint16_t, status_pm25);
+					SET_CMD_FIELD(rbuf, 8, uint16_t, 1);
+					SET_CMD_FIELD(rbuf, 10, uint16_t, status_temp);
+					SET_CMD_FIELD(rbuf, 12, uint16_t, 2);
+					SET_CMD_FIELD(rbuf, 14, uint16_t, status_humi);
+					SET_CMD_FIELD(rbuf, 16, uint16_t, 3);
+					SET_CMD_FIELD(rbuf, 18, uint16_t, status_gas);
+					break;
+				case 2: // remote control
+					rlen = 4;
+					break;
+				default:
+					printf("unknown device type %d\n", dev_type);
+					break;
+			}
+
 			SET_CMD_FIELD(rbuf, 2, uint16_t, rlen);
-			SET_CMD_FIELD(rbuf, 4, uint16_t, 0);
-			SET_CMD_FIELD(rbuf, 6, uint16_t, status_on_off);
 
 			printf("recv cmd: get status\n");
 			break;
@@ -82,20 +137,36 @@ static int deal_udp_pkt(int fd, uint8_t *buf, size_t count, struct sockaddr *cli
 		{
 			uint16_t status_id = GET_CMD_FIELD(buf, 4, uint16_t);
 			uint16_t status = GET_CMD_FIELD(buf, 6, uint16_t);
-			if (0 != status_id) {
-				printf("not supported status %d\n", status_id);
-				break;
+			uint16_t ret = 0;
+			switch (dev_type) {
+				case 0: // plug device
+					if (0 != status_id) {
+						printf("not supported status %d\n", status_id);
+						ret = 1;
+						break;
+					}
+
+					if (status != status_on_off) {
+						status_updated = true;
+						status_on_off = status;
+					}
+
+					break;
+				case 1: // sensor
+				case 2: // remote control
+					ret = 2;
+					printf("not supported set status\n");
+					break;
+				default:
+					printf("unknown device type %d\n", dev_type);
+					ret = 3;
+					break;
 			}
 
-			if (status != status_on_off) {
-				status_updated = true;
-				status_on_off = status;
-			}
-	
 			rlen = 8;
 			SET_CMD_FIELD(rbuf, 0, uint16_t, VS_CMD_RESULT);
 			SET_CMD_FIELD(rbuf, 2, uint16_t, rlen);
-			SET_CMD_FIELD(rbuf, 4, uint16_t, 1);
+			SET_CMD_FIELD(rbuf, 4, uint16_t, ret);
 
 			printf("recv cmd: set status[%d]\n", status);
 			break;
@@ -138,7 +209,8 @@ static int deal_udp_pkt(int fd, uint8_t *buf, size_t count, struct sockaddr *cli
 		}
 	}
 
-	sendto(fd, rbuf, rlen, 0, cliaddr, clilen);
+	if (rlen > 0)
+		sendto(fd, rbuf, rlen, 0, cliaddr, clilen);
 
 	if (!status_updated)
 		return 0;
@@ -210,6 +282,13 @@ int main(int argc, char *argv[])
 	struct sockaddr_in cliaddr;
 	socklen_t clilen = sizeof(struct sockaddr_in);
 	socklen_t mcastlen = sizeof(struct sockaddr_in);
+
+	if (argc < 2) {
+		printf("Usage: %s dev_type\n", argv[0]);
+		return -2;
+	}
+
+	dev_type = atoi(argv[1]);
 
 	sockfd = open_udp_listenfd(19001);
 	if (sockfd < 0) {
