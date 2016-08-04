@@ -107,6 +107,9 @@ static int cc9201_set_status(const HSB_STATUS_T *status)
 			cc9201_key_press(irdev, HSB_TV_ACTION_KEY_0 + id);
 
 			pdev->status.val[HSB_TV_STATUS_CHANNEL] = channel;
+
+			dev_status_updated(pdev->id, (HSB_STATUS_T *)status);
+
 			break;
 		}
 		default:
