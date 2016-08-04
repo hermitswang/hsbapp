@@ -212,31 +212,41 @@ static int parse_scene(HSB_SCENE_T *scene, uint8_t *buf, int len)
 	HSB_SCENE_ACT_T *pact = NULL;
 
 	while (offset < len) {
-		if (buf[offset] != 0xFF)
+		if (buf[offset] != 0xFF) {
+			hsb_debug("invalid scene, header %x\n", buf[offset]);
 			return HSB_E_INVALID_MSG;
+		}
 
 		paction->delay = buf[offset + 1];
 		paction->has_cond = buf[offset + 2] > 0 ? true : false;
 		paction->act_num = buf[offset + 3];
 		offset += 4;
 
+		hsb_debug("found a action, %d-%d-%d\n", paction->delay, paction->has_cond, paction->act_num);
+
 		if (paction->has_cond) {
 			pcond = &paction->condition;
-			if (buf[offset] != 0xFE)
+			if (buf[offset] != 0xFE) {
+				hsb_debug("invalid scene, condition header %x\n", buf[offset]);
 				return HSB_E_INVALID_MSG;
+			}
 
 			pcond->expr = buf[offset + 1];
 			pcond->devid = GET_CMD_FIELD(buf, offset + 2, uint16_t);
 			pcond->id = GET_CMD_FIELD(buf, offset + 4, uint16_t);
 			pcond->val = GET_CMD_FIELD(buf, offset + 6, uint16_t);
 			offset += 8;
+
+			hsb_debug("found a condition, %d-%d-%d-%d\n", pcond->devid, pcond->expr, pcond->id, pcond->val);
 		}
 
 		pact = &paction->acts[0];
 		for (id = 0; id < paction->act_num; id++)
 		{
-			if (buf[offset] != 0xFD)
+			if (buf[offset] != 0xFD) {
+				hsb_debug("invalid scene, action header %x\n", buf[offset]);
 				return HSB_E_INVALID_MSG;
+			}
 
 			pact->flag = buf[offset + 1];
 			pact->devid = GET_CMD_FIELD(buf, offset + 2, uint16_t);
@@ -244,6 +254,7 @@ static int parse_scene(HSB_SCENE_T *scene, uint8_t *buf, int len)
 			pact->param1 = GET_CMD_FIELD(buf, offset + 6, uint16_t);
 			pact->param2 = GET_CMD_FIELD(buf, offset + 8, uint32_t);
 			offset += 12;
+			hsb_debug("found a act, %d-%d-%d-%d\n", pact->devid, pact->id, pact->param1, pact->param2);
 			pact++;
 		}
 
@@ -846,8 +857,11 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 				break;
 			}
 
+			hsb_debug("add scene [%s]\n", scene->name);
+
 			/* add_scene */
 			ret = add_scene(scene);
+			hsb_debug("add scene [%s] success\n", scene->name);
 			rlen = _reply_result(reply_buf, ret, 0, cmd);
 
 			break;
@@ -857,6 +871,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			char name[HSB_SCENE_MAX_NAME_LEN];
 
 			strncpy(name, buf + 4, sizeof(name));
+			hsb_debug("del scene [%s]\n", name);
 
 			ret = del_scene(name);
 
@@ -869,6 +884,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 			char name[HSB_SCENE_MAX_NAME_LEN];
 
 			strncpy(name, buf + 4, sizeof(name));
+			hsb_debug("enter scene [%s]\n", name);
 
 			ret = enter_scene(name);
 
@@ -879,6 +895,8 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 		case HSB_CMD_GET_SCENE:
 		{
 			uint32_t id, num = 0;
+
+			hsb_debug("get scene\n");
 			ret = get_scene_num(&num);
 			if (HSB_E_OK != ret) {
 				hsb_debug("get scene num fail\n");
@@ -911,7 +929,7 @@ int deal_tcp_packet(int fd, uint8_t *buf, int len, void *reply, int *used)
 	}
 
 	if (rlen < 0) {
-		hsb_debug("rlen%d<0\n", rlen);
+		hsb_debug("rlen %d<0\n", rlen);
 		return -2;
 	}
 

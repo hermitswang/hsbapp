@@ -18,17 +18,13 @@ static HSB_DEV_OP_T cc9201_op;
 static HSB_DEV_OP_T gree_op;
 static HSB_DEV_DRV_OP_T ir_drv_op;
 
-typedef struct {
-	// TODO: channel mapping
-} CC9201_DATA_T;
-
 static uint8_t cc9201_key_map[HSB_TV_ACTION_LAST] = {
-	0x4C,	// TODO
-	0x48,	// TODO
+	0x4C,
+	0x48,
 	0x49,
 	0x43,
 	0x42,
-	0x46,	// TODO
+	0x46,
 	0x47,
 	0x44,
 	0x45,
@@ -158,6 +154,130 @@ static int cc9201_get_channel_db(HSB_DEV_T *pdev, HSB_CHANNEL_DB_T **pdb)
 	return HSB_E_OK;
 }
 
+static HSB_DEV_OP_T cc9201_op = {
+	cc9201_get_status,
+	cc9201_set_status,
+	cc9201_set_action,
+	cc9201_init,
+	cc9201_release,
+	cc9201_get_channel_db,
+};
+
+typedef enum {
+	GREE_STATUS_ID_WORK_MODE = 0,
+	GREE_STATUS_ID_POWER,
+	GREE_STATUS_ID_WIND_SPEED,
+	GREE_STATUS_ID_TEMPERATURE,
+	GREE_STATUS_ID_LIGHT,
+} GREE_STATUS_ID;
+
+static int gree_set_status(const HSB_STATUS_T *status)
+{
+	HSB_DEV_T *pdev = find_dev(status->devid);
+
+	if (!pdev)
+		return HSB_E_OTHERS;
+
+	HSB_DEV_T *irdev = pdev->ir_dev;
+	if (!irdev)
+		return HSB_E_OTHERS;
+
+	HSB_STATUS_T _status = { 0 };
+	int id;
+	uint16_t val;
+	bool auto_mode = false;
+	for (id = 0; id < status->num; id++)
+	{
+		val = status->val[id];
+		switch (status->id[id]) {
+			case GREE_STATUS_ID_WORK_MODE:
+				if (val > 4)
+					return HSB_E_BAD_PARAM;
+				if (val == 0)
+					auto_mode = true;
+				break;
+			case GREE_STATUS_ID_POWER:
+				if (val > 0)
+					val = 1;
+				break;
+			case GREE_STATUS_ID_WIND_SPEED:
+				if (val > 3)
+					return HSB_E_BAD_PARAM;
+				break;
+			case GREE_STATUS_ID_TEMPERATURE:
+				if (val < 16 || val > 30)
+					return HSB_E_BAD_PARAM;
+				if (auto_mode)
+					val = 25;
+				break;
+			case GREE_STATUS_ID_LIGHT:
+				if (val > 0)
+					val = 1;
+				break;
+			default:
+				return HSB_E_BAD_PARAM;
+				break;
+		}
+
+		_status.id[_status.num] = status->id[id];
+		_status.val[_status.num] = val;
+		_status.num++;
+	}
+
+	sync_dev_status(pdev, &_status);
+
+	HSB_DEV_STATUS_T *pstat = &pdev->status;
+	uint8_t data[4];
+
+	data[0] = pstat->val[GREE_STATUS_ID_WORK_MODE] & 0x07;
+	if (pstat->val[GREE_STATUS_ID_POWER] > 0)
+		data[0] |= (1 << 3);
+	data[0] |= ((pstat->val[GREE_STATUS_ID_WIND_SPEED] & 0x3) << 4);
+
+	data[1] = pstat->val[GREE_STATUS_ID_TEMPERATURE] & 0x0F;
+
+	data[2] = pstat->val[GREE_STATUS_ID_LIGHT] ? 0x20 : 0;
+
+	data[3] = 0;
+
+	HSB_ACTION_T act = { 0 };
+	act.devid = irdev->id;
+	act.id = HSB_ACT_TYPE_REMOTE_CONTROL;
+	act.param1 = HSB_IR_PROTOCOL_TYPE_GREE;
+	act.param2 = *(uint32_t *)data;
+
+	int ret = set_action(irdev, &act);
+	if (HSB_E_OK != ret) {
+		hsb_debug("set action fail ret=%d\n", ret);
+		return ret;
+	}
+
+	dev_status_updated(pdev->id, &_status);
+
+	return ret;
+}
+
+static int gree_get_status(HSB_STATUS_T *status)
+{
+	HSB_DEV_T *pdev = find_dev(status->devid);
+
+	if (!pdev)
+		return HSB_E_OTHERS;
+
+	load_dev_status(pdev, status);
+
+	return HSB_E_OK;
+}
+
+static HSB_DEV_OP_T gree_op = {
+	gree_get_status,
+	gree_set_status,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
+
 static int ir_add_dev(HSB_DEV_TYPE_T ir_type, HSB_DEV_CONFIG_T *cfg)
 {
 	uint32_t devid;
@@ -174,6 +294,7 @@ static int ir_add_dev(HSB_DEV_TYPE_T ir_type, HSB_DEV_CONFIG_T *cfg)
 			dev_info.cls = HSB_DEV_CLASS_STB;
 
 			status.num = 1;
+			status.val[0] = 0;
 
 			op = &cc9201_op;
 			break;
@@ -181,6 +302,11 @@ static int ir_add_dev(HSB_DEV_TYPE_T ir_type, HSB_DEV_CONFIG_T *cfg)
 			dev_info.cls = HSB_DEV_CLASS_AIR_CONDITIONER;
 
 			status.num = 5;
+			status.val[GREE_STATUS_ID_WORK_MODE] = 0;
+			status.val[GREE_STATUS_ID_POWER] = 0;
+			status.val[GREE_STATUS_ID_WIND_SPEED] = 0;
+			status.val[GREE_STATUS_ID_TEMPERATURE] = 25;
+			status.val[GREE_STATUS_ID_LIGHT] = 1;
 
 			op = &gree_op;
 			break;
@@ -227,87 +353,7 @@ static int ir_del_dev(uint32_t devid)
 	return dev_removed(devid);
 }
 
-static HSB_DEV_OP_T cc9201_op = {
-	cc9201_get_status,
-	cc9201_set_status,
-	cc9201_set_action,
-	cc9201_init,
-	cc9201_release,
-	cc9201_get_channel_db,
-};
 
-typedef enum {
-	GREE_STATUS_ID_WORK_MODE = 0,
-	GREE_STATUS_ID_POWER,
-	GREE_STATUS_ID_WIND_SPEED,
-	GREE_STATUS_ID_TEMPERATURE,
-	GREE_STATUS_ID_LIGHT,
-} GREE_STATUS_ID;
-
-static int gree_set_status(const HSB_STATUS_T *status)
-{
-	HSB_DEV_T *pdev = find_dev(status->devid);
-
-	if (!pdev)
-		return HSB_E_OTHERS;
-
-	HSB_DEV_T *irdev = pdev->ir_dev;
-	if (!irdev)
-		return HSB_E_OTHERS;
-
-	sync_dev_status(pdev, status);
-
-	HSB_DEV_STATUS_T *pstat = &pdev->status;
-	uint8_t data[4];
-
-	data[0] = pstat->val[GREE_STATUS_ID_WORK_MODE] & 0x07;
-	if (pstat->val[GREE_STATUS_ID_POWER] > 0)
-		data[0] |= (1 << 3);
-	data[0] |= ((pstat->val[GREE_STATUS_ID_WIND_SPEED] & 0x3) << 4);
-
-	data[1] = pstat->val[GREE_STATUS_ID_TEMPERATURE] & 0x0F;
-
-	data[2] = pstat->val[GREE_STATUS_ID_LIGHT] ? 0x20 : 0;
-
-	data[3] = 0;
-
-	HSB_ACTION_T act = { 0 };
-	act.devid = irdev->id;
-	act.id = HSB_ACT_TYPE_REMOTE_CONTROL;
-	act.param1 = HSB_IR_PROTOCOL_TYPE_GREE;
-	act.param2 = *(uint32_t *)data;
-
-	int ret = set_action(irdev, &act);
-	if (HSB_E_OK != ret) {
-		hsb_debug("set action fail ret=%d\n", ret);
-		return ret;
-	}
-
-	dev_status_updated(pdev->id, (HSB_STATUS_T *)status);
-
-	return ret;
-}
-
-static int gree_get_status(HSB_STATUS_T *status)
-{
-	HSB_DEV_T *pdev = find_dev(status->devid);
-
-	if (!pdev)
-		return HSB_E_OTHERS;
-
-	load_dev_status(pdev, status);
-
-	return HSB_E_OK;
-}
-
-static HSB_DEV_OP_T gree_op = {
-	gree_get_status,
-	gree_set_status,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-};
 
 static HSB_DEV_DRV_OP_T ir_drv_op = {
 	NULL,

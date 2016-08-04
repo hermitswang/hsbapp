@@ -206,22 +206,28 @@ static void scene_handler(gpointer data, gpointer user_data)
 
 		if (paction->has_cond) {
 			pcond = &paction->condition;
-			if (!check_condition(pcond))
+			if (!check_condition(pcond)) {
+				hsb_debug("condition not match\n");
 				continue;
-
+			}
 		}
 
 		if (delay < paction->delay) {
+			hsb_debug("sleep %d < %d\n", delay, paction->delay);
 			usleep(1000 * (paction->delay - delay));
 			delay = paction->delay;
+			hsb_debug("wake up\n");
 		}
 
 		for (index = 0; index < paction->act_num; index++)
 		{
 			pact = &paction->acts[index];
+			hsb_debug("execute action %d\n", index);
 			execute_action(pact);
 		}
 	}
+
+	hsb_debug("start scene done\n");
 
 	free_scene(scene);
 	return;
