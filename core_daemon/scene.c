@@ -214,7 +214,7 @@ static void scene_handler(gpointer data, gpointer user_data)
 
 		if (delay < paction->delay) {
 			hsb_debug("sleep %d < %d\n", delay, paction->delay);
-			usleep(1000 * (paction->delay - delay));
+			sleep(paction->delay - delay);
 			delay = paction->delay;
 			hsb_debug("wake up\n");
 		}
@@ -224,6 +224,9 @@ static void scene_handler(gpointer data, gpointer user_data)
 			pact = &paction->acts[index];
 			hsb_debug("execute action %d\n", index);
 			execute_action(pact);
+			//usleep(500*1000);
+			sleep(1);
+			// TODO: merge action
 		}
 	}
 

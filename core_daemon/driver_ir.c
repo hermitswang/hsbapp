@@ -186,6 +186,8 @@ static int gree_set_status(const HSB_STATUS_T *status)
 		return HSB_E_OTHERS;
 
 	HSB_STATUS_T _status = { 0 };
+	_status.devid = pdev->id;
+
 	int id;
 	uint16_t val;
 	bool auto_mode = false;

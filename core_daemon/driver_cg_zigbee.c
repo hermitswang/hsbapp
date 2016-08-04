@@ -736,8 +736,8 @@ static void *_monitor_thread(void *arg)
 			if (nwrite < pctx->send_len)
 				hsb_debug("uart send %d < %d\n", nwrite, pctx->send_len);
 
-#ifdef CZ_TEST
 			hsb_debug("write uart %d\n", nwrite);
+#ifdef CZ_TEST
 			print_buf(pctx->send_buf, pctx->send_len);
 #endif
 			continue;
