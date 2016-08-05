@@ -12,6 +12,7 @@
 #include "device.h"
 #include "hsb_error.h"
 #include "hsb_config.h"
+#include "utils.h"
 
 //#define CZ_TEST
 
@@ -804,7 +805,10 @@ int init_cz_drv(void)
 	pctx->fd = fd;
 	pctx->trans_id = 1;
 
-	strcpy(pctx->listen_path, DAEMON_WORK_DIR"driver_cz.listen");
+	snprintf(pctx->listen_path,
+		sizeof(pctx->listen_path),
+		"%sdriver_cz.listen",
+		get_work_dir());
 
 	pthread_t thread_id;
 	if (pthread_create(&thread_id, NULL, (thread_entry_func)_monitor_thread, NULL))

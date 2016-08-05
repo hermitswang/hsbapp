@@ -24,6 +24,8 @@
 #include <net/if.h>
 #include <stdbool.h>
 #include "network_utils.h"
+#include "hsb_config.h"
+#include "utils.h"
 
 int connect_nonb(const char *ip,int port,struct timeval *timeout) 
 {
@@ -196,7 +198,8 @@ int get_broadcast_address(int sockfd, struct in_addr *addr)
 {
 	struct sockaddr_in taddr;
 	struct ifreq ifr;
-	strncpy(ifr.ifr_name, ETH_INTERFACE, sizeof(ifr.ifr_name));
+
+	strncpy(ifr.ifr_name, get_eth_interface(), sizeof(ifr.ifr_name));
 
 	if (ioctl(sockfd, SIOCGIFBRDADDR, &ifr) < 0)
 	{
@@ -215,7 +218,8 @@ int get_ip(struct in_addr *addr)
 {
 	struct sockaddr_in taddr;
 	struct ifreq ifr;
-	strncpy(ifr.ifr_name, ETH_INTERFACE, sizeof(ifr.ifr_name));
+
+	strncpy(ifr.ifr_name, get_eth_interface(), sizeof(ifr.ifr_name));
 
 	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sockfd < 0) {

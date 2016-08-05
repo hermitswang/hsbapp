@@ -12,6 +12,8 @@
 
 #include "hsb_param.h"
 #include <glib.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 int create_pid_file(char *pidfile) ;
 
@@ -29,5 +31,10 @@ void hsb_syslog(const char *fmt , ... );
 gint hsb_mkstemp (gchar *tmpl);
 
 time_t get_uptime(void);
+uint64_t get_msec(void);
+
+bool is_android(void);
+const char *get_work_dir(void);
+const char *get_eth_interface(void);
 
 #endif

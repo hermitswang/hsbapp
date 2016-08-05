@@ -6,9 +6,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define ETH_INTERFACE	"eth0"
-//#define ETH_INTERFACE	"wlan0"
-
 #define GET_CMD_FIELD(_buf, _off, _type)  *(_type *)(_buf + _off)
 
 #define SET_CMD_FIELD(_buf, _off, _type, _val)	do { \

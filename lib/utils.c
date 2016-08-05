@@ -346,3 +346,42 @@ time_t get_uptime(void)
 	return time(NULL);
 }
 
+uint64_t get_msec(void)
+{
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+
+	return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+}
+
+bool is_android(void)
+{
+	return (0 == access("/system/bin", F_OK));
+}
+
+const char *get_work_dir(void)
+{
+	const char *work_dir;
+
+	if (is_android())
+		work_dir = ANDROID_WORK_DIR;
+	else
+		work_dir = LINUX_WORK_DIR;
+
+	return work_dir;
+}
+
+const char *get_eth_interface(void)
+{
+	const char *eth_interface;
+
+	if (is_android())
+		eth_interface = ANDROID_ETH_INTERFACE;
+	else
+		eth_interface = LINUX_ETH_INTERFACE;
+
+	return eth_interface;
+
+}
+
+

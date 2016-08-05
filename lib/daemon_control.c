@@ -20,18 +20,21 @@
 #include <sys/time.h>
 #include <syslog.h>
 #include <time.h>
+#include "utils.h"
 
 gboolean daemon_init(hsb_daemon_config *my_daemon, gboolean background)
 {
 	int fd ;
+	const char *work_dir = get_work_dir();
 
 	if ( background == TRUE )
 		if ( -1 == daemon(0,0) )
 			return FALSE;
 
 	umask(0022);
-	mkdir(DAEMON_WORK_DIR,0755);
-	if ( -1 == chdir(DAEMON_WORK_DIR) )
+	mkdir(work_dir, 0755);
+
+	if ( -1 == chdir(work_dir) )
 		return FALSE ;
 
 	if (total_cfg_read() == FALSE)

@@ -168,6 +168,7 @@ static bool check_condition(HSB_SCENE_CONDITION_T *pcond)
 	return false;
 }
 
+#if 0
 static void execute_action(HSB_SCENE_ACT_T *pact)
 {
 	if (CHECK_BIT(pact->flag, 0)) {
@@ -188,16 +189,62 @@ static void execute_action(HSB_SCENE_ACT_T *pact)
 
 	return;
 }
+#endif
+
+static int execute_action(HSB_SCENE_ACTION_T *paction)
+{
+	int id, cnt, devid, num = 0;
+	HSB_SCENE_ACT_T *pact = NULL;
+	HSB_STATUS_T status[8] = { 0 };
+	HSB_STATUS_T *pstat = NULL;
+
+	for (id = 0; id < paction->act_num; id++)
+	{
+		pact = &paction->acts[id];
+
+		devid = pact->devid;
+		for (cnt = 0; cnt < num; cnt++)
+		{
+			pstat = &status[cnt];
+			if (pstat->devid == devid)
+			{
+				pstat->id[pstat->num] = pact->id;
+				pstat->val[pstat->num] = pact->param1;
+				pstat->num++;
+				break;
+			}
+		}
+
+		if (cnt < num)
+			continue;
+
+		pstat = &status[num];
+		pstat->devid = devid;
+		pstat->id[pstat->num] = pact->id;
+		pstat->val[pstat->num] = pact->param1;
+		pstat->num++;
+
+		num++;
+	}
+
+	for (id = 0; id < num; id++)
+	{
+		pstat = &status[id];
+
+		set_dev_status_async(pstat, NULL);
+	}
+
+	return HSB_E_OK;
+}
 
 static void scene_handler(gpointer data, gpointer user_data)
 {
 	HSB_SCENE_T *scene = (HSB_SCENE_T *)data;
 
-	int id, index;
+	int id;
 	int delay = 0;
 	HSB_SCENE_ACTION_T *paction = NULL;
 	HSB_SCENE_CONDITION_T *pcond = NULL;
-	HSB_SCENE_ACT_T *pact = NULL;
 
 	hsb_debug("start scene [%s]\n", scene->name);
 
@@ -213,21 +260,12 @@ static void scene_handler(gpointer data, gpointer user_data)
 		}
 
 		if (delay < paction->delay) {
-			hsb_debug("sleep %d < %d\n", delay, paction->delay);
+			hsb_debug("sleep (%d - %d=%d)\n", paction->delay, delay, paction->delay - delay);
 			sleep(paction->delay - delay);
 			delay = paction->delay;
-			hsb_debug("wake up\n");
 		}
 
-		for (index = 0; index < paction->act_num; index++)
-		{
-			pact = &paction->acts[index];
-			hsb_debug("execute action %d\n", index);
-			execute_action(pact);
-			//usleep(500*1000);
-			sleep(1);
-			// TODO: merge action
-		}
+		execute_action(paction);
 	}
 
 	hsb_debug("start scene done\n");

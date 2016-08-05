@@ -16,6 +16,7 @@
 #include "network_utils.h"
 #include "net_protocol.h"
 #include "scene.h"
+#include "utils.h"
 
 #define MAKE_CMD_HDR(_buf, _cmd, _len)	do { \
 	SET_CMD_FIELD(_buf, 0, uint16_t, _cmd); \
@@ -1057,6 +1058,7 @@ static int init_client_pool(void)
 {
 	int cnt;
 	tcp_client_context *pctx = NULL;
+	const char *work_dir = get_work_dir();
 
 	memset(&client_pool, 0, sizeof(client_pool));
 
@@ -1068,7 +1070,8 @@ static int init_client_pool(void)
 
 		snprintf(pctx->listen_path,
 			sizeof(pctx->listen_path),
-			DAEMON_WORK_DIR"core_client_%d.listen",
+			"%score_client_%d.listen",
+			work_dir,
 			cnt);
 
 		//pctx->un_sockfd = unix_socket_new_listen((const char *)pctx->listen_path);

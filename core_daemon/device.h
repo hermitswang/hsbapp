@@ -219,6 +219,8 @@ typedef struct _HSB_DEV_T {
 
 	struct _HSB_DEV_T	*ir_dev;
 	void			*priv_data;
+
+	uint64_t		op_msec;
 } HSB_DEV_T;
 
 int init_dev_module(void);

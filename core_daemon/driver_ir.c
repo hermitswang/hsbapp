@@ -13,6 +13,20 @@
 #include "hsb_config.h"
 #include "channel.h"
 
+static int ir_dev_delay(HSB_DEV_T *pdev)
+{
+	uint64_t msec = get_msec();
+	uint64_t next = pdev->op_msec + 1000;
+
+	if (msec < next) {
+		usleep(next - msec);
+	}
+
+	pdev->op_msec = get_msec();
+
+	return HSB_E_OK;
+}
+
 static HSB_DEV_DRV_T ir_drv;
 static HSB_DEV_OP_T cc9201_op;
 static HSB_DEV_OP_T gree_op;
@@ -95,13 +109,17 @@ static int cc9201_set_status(const HSB_STATUS_T *status)
 			uint32_t channel = status->val[0];
 			int id;
 
+			ir_dev_delay(pdev);
+
 			id = (channel / 100) % 10;
 			cc9201_key_press(irdev, HSB_TV_ACTION_KEY_0 + id);
-			usleep(200000);
+
+			ir_dev_delay(pdev);
 
 			id = (channel / 10) % 10;
 			cc9201_key_press(irdev, HSB_TV_ACTION_KEY_0 + id);
-			usleep(200000);
+
+			ir_dev_delay(pdev);
 
 			id = channel % 10;
 			cc9201_key_press(irdev, HSB_TV_ACTION_KEY_0 + id);
@@ -146,6 +164,8 @@ static int cc9201_set_action(const HSB_ACTION_T *act)
 	HSB_DEV_T *irdev = pdev->ir_dev;
 	if (!irdev)
 		return HSB_E_OTHERS;
+
+	ir_dev_delay(pdev);
 
 	return cc9201_key_press(irdev, act->param1);
 }
@@ -244,6 +264,8 @@ static int gree_set_status(const HSB_STATUS_T *status)
 	data[2] = pstat->val[GREE_STATUS_ID_LIGHT] ? 0x20 : 0;
 
 	data[3] = 0;
+
+	ir_dev_delay(pdev);
 
 	HSB_ACTION_T act = { 0 };
 	act.devid = irdev->id;
