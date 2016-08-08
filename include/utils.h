@@ -37,4 +37,7 @@ bool is_android(void);
 const char *get_work_dir(void);
 const char *get_eth_interface(void);
 
+int str_to_mac(char *buf, uint8_t *pmac);
+int mac_to_str(uint8_t *mac, char *buf);
+
 #endif

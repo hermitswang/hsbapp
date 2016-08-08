@@ -16,6 +16,9 @@
 #define ANDROID_WORK_DIR "/dev/hsb/"
 #define EXECUTE_PATH  "/opt/bin/"
 
+#define HSB_CONFIG_DIR	""
+#define HSB_CONFIG_FILE	"hsb.xml"
+
 #define LINUX_ETH_INTERFACE	"eth0"
 #define ANDROID_ETH_INTERFACE	"wlan0"
 

@@ -43,6 +43,9 @@ all :
 lib :
 	make all -C lib
 
+exp :
+	make all -C experiment
+
 core : lib
 	make all -C core_daemon
 

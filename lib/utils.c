@@ -384,4 +384,33 @@ const char *get_eth_interface(void)
 
 }
 
+int str_to_mac(char *buf, uint8_t *pmac)
+{
+	if (!buf || !pmac)
+		return -1;
+
+	uint32_t mac[8];
+	sscanf(buf, "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
+		&mac[0], &mac[1], &mac[2], &mac[3],
+		&mac[4], &mac[5], &mac[6], &mac[7]);
+
+	int id;
+	for (id = 0; id < 8; id++) {
+		pmac[id] = (uint8_t)(mac[id] & 0xFF);
+	}
+
+	return 0;
+}
+
+int mac_to_str(uint8_t *mac, char *buf)
+{
+	if (!buf || !mac)
+		return -1;
+
+	sprintf(buf, "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
+		mac[0], mac[1], mac[2], mac[3],
+		mac[4], mac[5], mac[6], mac[7]);
+
+	return 0;
+}
 

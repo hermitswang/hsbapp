@@ -9,6 +9,11 @@
 #include "hsb_config.h"
 #include "thread_utils.h"
 #include "scene.h"
+#include "utils.h"
+
+#include <libxml/xmlmemory.h>
+#include <libxml/parser.h>
+#include <libxml/tree.h>
 
 typedef struct {
 	GQueue			queue;
@@ -34,6 +39,251 @@ static HSB_DEVICE_CB_T gl_dev_cb = { 0 };
 #define HSB_DEVICE_CB_UNLOCK()	do { \
 	g_mutex_unlock(&gl_dev_cb.mutex); \
 } while (0)
+
+#define INT_TO_BUF(val, buf)	do { \
+	snprintf(buf, sizeof(buf), "%d", val); \
+} while (0)
+
+static int _add_node(xmlNodePtr parent, const char *name, char *val)
+{
+	xmlNodePtr child, value;
+
+	child = xmlNewNode(NULL, BAD_CAST name);
+	if (!child)
+		return HSB_E_NO_MEMORY;
+
+	value = xmlNewText(BAD_CAST val);
+	if (!value) {
+		xmlFree(child);
+		return HSB_E_NO_MEMORY;
+	}
+
+	xmlAddChild(child, value);
+	xmlAddChild(parent, child);
+
+	return HSB_E_OK;
+}
+
+static xmlNodePtr make_dev_node(HSB_DEV_T *pdev)
+{
+	char buf[128];
+
+	xmlNodePtr node = xmlNewNode(NULL, BAD_CAST"device");
+
+	/* set id */
+	INT_TO_BUF(pdev->id, buf);
+	xmlNewProp(node, BAD_CAST"id", BAD_CAST buf);
+
+	/* set type */
+	INT_TO_BUF(pdev->info.dev_type, buf);
+	_add_node(node, "type", buf);
+
+	/* set mac */
+	uint8_t *mac = pdev->info.mac;
+	mac_to_str(mac, buf);
+
+	_add_node(node, "mac", buf);
+
+	/* set name */
+	_add_node(node, "name", pdev->config.name);
+
+	/* set location */
+	_add_node(node, "location", pdev->config.location);
+
+	/* TODO */
+	
+
+	return node;
+}
+
+static int save_config(void)
+{
+	xmlDocPtr doc;
+	xmlNodePtr root, node;
+
+	doc = xmlNewDoc(BAD_CAST"1.0");
+	if (!doc)
+		return HSB_E_NO_MEMORY;
+
+	root = xmlNewNode(NULL, BAD_CAST"hsb");
+	if (!root) {
+		xmlFreeDoc(doc);
+		return HSB_E_NO_MEMORY;
+	}
+
+	xmlDocSetRootElement(doc, root);
+
+	int id, len;
+	GQueue *queue;
+	HSB_DEV_T *pdev;
+
+	queue = &gl_dev_cb.queue;
+	len = g_queue_get_length(queue);
+	for (id = 0; id < len; id++)
+	{
+		pdev = (HSB_DEV_T *)g_queue_peek_nth(queue, id);
+		if (!pdev) {
+			hsb_critical("device null\n");
+			continue;
+		}
+
+		node = make_dev_node(pdev);
+
+		/* add to root */
+		xmlAddChild(root, node);
+	}
+
+	queue = &gl_dev_cb.offq;
+	len = g_queue_get_length(queue);
+	for (id = 0; id < len; id++)
+	{
+		pdev = (HSB_DEV_T *)g_queue_peek_nth(queue, id);
+		if (!pdev) {
+			hsb_critical("device null\n");
+			continue;
+		}
+
+		node = make_dev_node(pdev);
+
+		/* add to root */
+		xmlAddChild(root, node);
+	}
+
+	char file[128];
+	snprintf(file, sizeof(file), HSB_CONFIG_DIR"%s", HSB_CONFIG_FILE);
+
+	xmlSaveFormatFileEnc(file, doc, "UTF-8", 1);
+
+	xmlFreeDoc(doc);
+
+	return HSB_E_OK;
+}
+
+static int parse_dev(xmlNodePtr node, HSB_DEV_T **ppdev)
+{
+	GQueue *devq, *offq;
+	HSB_DEV_T *pdev;
+
+	devq = &gl_dev_cb.queue;
+	offq = &gl_dev_cb.offq;
+
+	xmlNodePtr cur;
+	xmlChar *key;
+	uint32_t devid;
+
+	if (!ppdev)
+		return HSB_E_BAD_PARAM;
+
+	key = xmlGetProp(node, "id");
+	devid = atoi(key);
+	xmlFree(key);
+
+	pdev = alloc_dev(devid);
+	if (!pdev)
+		return HSB_E_NO_MEMORY;
+
+	cur = node->xmlChildrenNode;
+	while (cur) {
+		key = NULL;
+		if (cur->xmlChildrenNode)
+			key = xmlNodeGetContent(cur->xmlChildrenNode);
+
+		if (0 == xmlStrcmp(cur->name, BAD_CAST"type")) {
+			if (!key) {
+				hsb_critical("parse fail: type not found\n");
+				goto fail;
+			}
+
+			pdev->info.dev_type = atoi(key);
+			
+		} else if (0 == xmlStrcmp(cur->name, BAD_CAST"mac")) {
+			if (!key) {
+				hsb_critical("parse fail: mac not found\n");
+				goto fail;
+			}
+
+			str_to_mac(key, pdev->info.mac);	
+
+		} else if (0 == xmlStrcmp(cur->name, BAD_CAST"name")) {
+			if (!key) {
+				hsb_critical("parse fail: name not found\n");
+				goto fail;
+			}
+
+			strncpy(pdev->config.name, key, sizeof(pdev->config.name));
+		} else if (0 == xmlStrcmp(cur->name, BAD_CAST"location")) {
+			if (!key) {
+				hsb_critical("parse fail: location not found\n");
+				goto fail;
+			}
+
+			strncpy(pdev->config.location, key, sizeof(pdev->config.location));
+		}
+
+		if (key)
+			xmlFree(key);
+
+		cur = cur->next;
+	}
+
+	*ppdev = pdev;
+
+	if (pdev->info.dev_type > 2) { // TODO
+		hsb_debug("add a device [%d] to devq\n", devid);
+		g_queue_push_tail(devq, pdev);
+	} else {
+		hsb_debug("add a device [%d] to offq\n", devid);
+		g_queue_push_tail(offq, pdev);
+	}
+
+	return HSB_E_OK;
+fail:
+	if (key)
+		xmlFree(key);
+
+	destroy_dev(pdev);
+
+	return HSB_E_OTHERS;
+}
+
+static int load_config(void)
+{
+	xmlDocPtr doc;
+	xmlNodePtr cur;
+	HSB_DEV_T *pdev = NULL;
+	int ret;
+
+	char file[128];
+	snprintf(file, sizeof(file), HSB_CONFIG_DIR"%s", HSB_CONFIG_FILE);
+
+	doc = xmlParseFile(file);
+	if (!doc) {
+		hsb_critical("xml parse failed\n");
+		return HSB_E_OTHERS;
+	}
+
+	cur = xmlDocGetRootElement(doc);
+	if (!cur) {
+		hsb_critical("load config root empty\n");
+		return HSB_E_OTHERS;
+	}
+
+	cur = cur->xmlChildrenNode;
+
+	while (cur) {
+		if (0 == xmlStrcmp(cur->name, (const xmlChar *)"device")) {
+			ret = parse_dev(cur, &pdev);
+			if (ret != HSB_E_OK)
+				hsb_critical("parse dev fail, ret=%d\n", ret);
+		}
+
+		cur = cur->next;
+	}
+
+	xmlFreeDoc(doc);
+
+	return HSB_E_OK;
+}
 
 int get_dev_id_list(uint32_t *dev_id, int *dev_num)
 {
@@ -604,6 +854,19 @@ HSB_DEV_T *find_dev_by_ip(struct in_addr *ip)
 	return NULL;
 }
 
+HSB_DEV_T *alloc_dev(uint32_t devid)
+{
+	HSB_DEV_T *pdev = g_slice_new0(HSB_DEV_T);
+	if (!pdev)
+		return NULL;
+
+	/* set default value */
+	pdev->id = devid;
+	pdev->work_mode = HSB_WORK_MODE_ALL;
+
+	return pdev;
+}
+
 HSB_DEV_T *create_dev(void)
 {
 	HSB_DEV_T *pdev = g_slice_new0(HSB_DEV_T);
@@ -687,8 +950,7 @@ int dev_online(uint32_t drvid,
 			continue;
 		}
 
-		if (pdev->driver->id == drvid &&
-		    0 == memcmp(pdev->info.mac, info->mac, 8)) {
+		if (0 == memcmp(pdev->info.mac, info->mac, 8)) {
 			break;
 		}
 	}
@@ -724,15 +986,24 @@ int dev_online(uint32_t drvid,
 		dev_updated(pdev->id, HSB_DEV_UPDATED_TYPE_NEW_ADD, pdev->info.dev_type);
 
 		hsb_debug("device newadd %d\n", pdev->id);
+		/* TODO */
+		save_config();
 	} else {
 		g_queue_pop_nth(offq, id);
 
-		HSB_DEVICE_CB_LOCK();
+		pdev->driver = _find_drv(drvid);
+		pdev->op = op;
+		pdev->priv_data = priv;
 		pdev->state = HSB_DEV_STATE_ONLINE;
+
+		memcpy(&pdev->info, info, sizeof(*info));
+		memcpy(&pdev->status, status, sizeof(*status));
+
+		pdev->state = HSB_DEV_STATE_ONLINE;
+
+		HSB_DEVICE_CB_LOCK();
 		g_queue_push_tail(queue, pdev);
 		HSB_DEVICE_CB_UNLOCK();
-
-		memcpy(&pdev->status, status, sizeof(*status));
 
 		link_device(pdev);
 		update_link(pdev);
@@ -1190,6 +1461,8 @@ int init_dev_module(void)
 	gl_dev_cb.dev_id = 1;
 
 	init_private_thread();
+
+	load_config();
 
 	init_virtual_switch_drv();
 	init_cz_drv();

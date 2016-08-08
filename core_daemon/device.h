@@ -252,6 +252,7 @@ int get_dev_linkage(uint32_t dev_id, uint16_t link_id, HSB_LINKAGE_T *link);
 int set_dev_linkage(uint32_t dev_id, const HSB_LINKAGE_T *link);
 int del_dev_linkage(uint32_t dev_id, uint16_t link_id);
 
+HSB_DEV_T *alloc_dev(uint32_t devid);
 HSB_DEV_T *create_dev(void);
 int destroy_dev(HSB_DEV_T *dev);
 int register_dev(HSB_DEV_T *dev);
