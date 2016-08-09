@@ -251,7 +251,7 @@ static xmlNodePtr make_scene_node(HSB_SCENE_T *pscene)
 		xmlAddChild(node, action);
 	}
 
-	return HSB_E_OK;
+	return node;
 }
 
 int save_config(void)
@@ -447,6 +447,7 @@ static int parse_dev(xmlNodePtr node, HSB_DEV_T **ppdev)
 				pstatus = &pdev->timer_status[id];
 
 				pstatus->active = true;
+				ptimer->id = id;
 				while (timer) {
 					pbuf = xmlNodeGetContent(timer->xmlChildrenNode);
 
@@ -604,6 +605,8 @@ static int parse_scene(xmlNodePtr node)
 
 		cur = cur->next;
 	}
+
+	add_scene(pscene);
 
 	return HSB_E_OK;
 }

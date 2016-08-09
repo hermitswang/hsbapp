@@ -159,13 +159,16 @@ static int deal_tcp_pkt(int fd, void *buf, size_t count, int *used)
 			uint8_t min = GET_CMD_FIELD(buf, 13, uint8_t);
 			uint8_t sec = GET_CMD_FIELD(buf, 14, uint8_t);
 			uint8_t wday = GET_CMD_FIELD(buf, 15, uint8_t);
-			uint16_t act_id = GET_CMD_FIELD(buf, 16, uint16_t);
-			uint16_t act_param1 = GET_CMD_FIELD(buf, 18, uint16_t);
-			uint32_t act_param2 = GET_CMD_FIELD(buf, 20, uint32_t);
+			uint16_t year = GET_CMD_FIELD(buf, 16, uint16_t);
+			uint8_t mon = GET_CMD_FIELD(buf, 18, uint8_t);
+			uint8_t mday = GET_CMD_FIELD(buf, 19, uint8_t);
+			uint16_t act_id = GET_CMD_FIELD(buf, 20, uint16_t);
+			uint16_t act_param1 = GET_CMD_FIELD(buf, 22, uint16_t);
+			uint32_t act_param2 = GET_CMD_FIELD(buf, 24, uint32_t);
 
 			printf("get dev %d timer info:\n", dev_id);
-			printf("id=%d, work_mode=%d, flag=%02x, hour=%d, min=%d, sec=%d, wday=%02x\n",
-				timer_id, work_mode, flag, hour, min, sec, wday);
+			printf("id=%d, work_mode=%d, flag=%02x, hour=%d, min=%d, sec=%d, wday=%02x, year=%d, mon=%d, mday=%d\n",
+				timer_id, work_mode, flag, hour, min, sec, wday, year, mon, mday);
 			printf("act: %d, param1=%d, param2=%x\n", act_id, act_param1, act_param2);
 			break;
 		}
