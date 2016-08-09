@@ -4,11 +4,21 @@
 #include "hsb_error.h"
 #include "debug.h"
 
-int init_channel(HSB_CHANNEL_DB_T *db)
+HSB_CHANNEL_DB_T *alloc_channel_db(void)
 {
-	g_queue_init(&db->queue);
-	g_mutex_init(&db->mutex);
+	HSB_CHANNEL_DB_T *pdb = g_slice_new0(HSB_CHANNEL_DB_T);
+	if (!pdb)
+		return NULL;
+	
+	g_queue_init(&pdb->queue);
+	g_mutex_init(&pdb->mutex);
 
+	return pdb;
+}
+
+int release_channel_db(HSB_CHANNEL_DB_T *pdb)
+{
+	g_slice_free(HSB_CHANNEL_DB_T, pdb);
 	return HSB_E_OK;
 }
 

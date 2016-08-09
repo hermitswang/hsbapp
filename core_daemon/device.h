@@ -113,13 +113,13 @@ typedef struct {
 	int (*set_action)(const HSB_ACTION_T *act);
 	int (*init)(void **priv);
 	int (*release)(void *priv);
-	int (*get_channel_db)(struct _HSB_DEV_T *pdev, HSB_CHANNEL_DB_T **pdb);
 } HSB_DEV_OP_T;
 
 typedef struct {
 	int (*probe)(void);
 	int (*add_dev)(HSB_DEV_TYPE_T dev_type, HSB_DEV_CONFIG_T *cfg);
 	int (*del_dev)(uint32_t devid);
+	int (*recover_dev)(uint32_t devid, uint32_t type);
 } HSB_DEV_DRV_OP_T;
 
 typedef struct _HSB_DEV_DRV_T {
@@ -198,6 +198,7 @@ typedef struct _HSB_DEV_T {
 	HSB_DEV_CONFIG_T	config;
 
 	uint32_t		work_mode;
+	HSB_CHANNEL_DB_T	*pchan_db;
 
 	HSB_TIMER_T		timer[HSB_DEV_MAX_TIMER_NUM];
 	HSB_TIMER_STATUS_T	timer_status[HSB_DEV_MAX_TIMER_NUM];
@@ -214,6 +215,7 @@ typedef struct _HSB_DEV_T {
 
 	uint32_t		idle_time;
 
+	uint32_t		drvid;
 	HSB_DEV_DRV_T		*driver;
 	HSB_DEV_OP_T		*op;
 
@@ -262,10 +264,18 @@ int dev_online(uint32_t drvid,
 		HSB_DEV_STATUS_T *status,
 		HSB_DEV_OP_T *op,
 		HSB_DEV_CONFIG_T *cfg,
+		bool support_channel,
 		void *priv,
 		uint32_t *devid);
 int dev_offline(uint32_t devid);
 int dev_removed(uint32_t devid);
+int dev_recovered(uint32_t devid,
+		uint32_t drvid,
+		HSB_DEV_INFO_T *info,
+		HSB_DEV_STATUS_T *status,
+		HSB_DEV_OP_T *op,
+		bool support_channel,
+		void *priv);
 
 int dev_status_updated(uint32_t devid, HSB_STATUS_T *status);
 int dev_updated(uint32_t devid, HSB_DEV_UPDATED_TYPE_T type, HSB_DEV_TYPE_T dev_type);
@@ -293,6 +303,8 @@ int report_all_device(void *data);
 
 int sync_dev_status(HSB_DEV_T *pdev, const HSB_STATUS_T *status);
 int load_dev_status(HSB_DEV_T *pdev, HSB_STATUS_T *status);
+
+int save_config(void);
 
 #endif
 

@@ -67,6 +67,7 @@ static int _add_node(xmlNodePtr parent, const char *name, char *val)
 static xmlNodePtr make_dev_node(HSB_DEV_T *pdev)
 {
 	char buf[128];
+	int id, num;
 
 	xmlNodePtr node = xmlNewNode(NULL, BAD_CAST"device");
 
@@ -77,6 +78,10 @@ static xmlNodePtr make_dev_node(HSB_DEV_T *pdev)
 	/* set type */
 	INT_TO_BUF(pdev->info.dev_type, buf);
 	_add_node(node, "type", buf);
+
+	/* set drvid */
+	INT_TO_BUF(pdev->drvid, buf);
+	_add_node(node, "drvid", buf);
 
 	/* set mac */
 	uint8_t *mac = pdev->info.mac;
@@ -90,14 +95,168 @@ static xmlNodePtr make_dev_node(HSB_DEV_T *pdev)
 	/* set location */
 	_add_node(node, "location", pdev->config.location);
 
-	/* TODO */
-	
+	/* set channel */
+	HSB_CHANNEL_DB_T *pchan = pdev->pchan_db;
+	if (pchan)
+	{
+		xmlNodePtr channel;
+		get_channel_num(pchan, &num);
+		for (id = 0; id < num; id++)
+		{
+			char name[64];
+			uint32_t cid;
+			get_channel_by_id(pchan, id, name, &cid);
+
+			channel = xmlNewNode(NULL, BAD_CAST"channel");
+			_add_node(channel, "cname", name);
+
+			INT_TO_BUF(cid, buf);
+			_add_node(channel, "cid", buf);
+
+			xmlAddChild(node, channel);
+		}
+	}
+
+	/* set timer */
+	HSB_TIMER_T *ptimer = NULL;
+	HSB_TIMER_STATUS_T *pstatus = NULL;
+	xmlNodePtr timer;
+	for (id = 0; id < HSB_DEV_MAX_TIMER_NUM; id++)
+	{
+		ptimer = &pdev->timer[id];
+		pstatus = &pdev->timer_status[id];
+
+		if (!pstatus->active)
+			continue;
+
+		timer = xmlNewNode(NULL, BAD_CAST"timer");
+		
+		INT_TO_BUF(id, buf);
+		xmlNewProp(timer, BAD_CAST"id", BAD_CAST buf);
+
+		INT_TO_BUF(ptimer->work_mode, buf);
+		_add_node(timer, "work_mode", buf);
+
+		INT_TO_BUF(ptimer->flag, buf);
+		_add_node(timer, "flag", buf);
+
+		INT_TO_BUF(ptimer->year, buf);
+		_add_node(timer, "year", buf);
+
+		INT_TO_BUF(ptimer->mon, buf);
+		_add_node(timer, "mon", buf);
+
+		INT_TO_BUF(ptimer->mday, buf);
+		_add_node(timer, "mday", buf);
+
+		INT_TO_BUF(ptimer->hour, buf);
+		_add_node(timer, "hour", buf);
+
+		INT_TO_BUF(ptimer->min, buf);
+		_add_node(timer, "min", buf);
+
+		INT_TO_BUF(ptimer->sec, buf);
+		_add_node(timer, "sec", buf);
+
+		INT_TO_BUF(ptimer->wday, buf);
+		_add_node(timer, "wday", buf);
+
+		INT_TO_BUF(ptimer->act_id, buf);
+		_add_node(timer, "act_id", buf);
+
+		INT_TO_BUF(ptimer->act_param1, buf);
+		_add_node(timer, "act_param1", buf);
+
+		INT_TO_BUF(ptimer->act_param2, buf);
+		_add_node(timer, "act_param2", buf);
+
+		xmlAddChild(node, timer);
+	}
 
 	return node;
 }
 
-static int save_config(void)
+static xmlNodePtr make_scene_node(HSB_SCENE_T *pscene)
 {
+	char buf[128];
+	int id, num;
+
+	xmlNodePtr node = xmlNewNode(NULL, BAD_CAST"scene");
+
+	INT_TO_BUF(pscene->act_num, buf);
+	xmlNewProp(node, BAD_CAST"act_num", BAD_CAST buf);
+	xmlNewProp(node, BAD_CAST"name", BAD_CAST pscene->name);
+
+	HSB_SCENE_ACTION_T *paction = NULL;
+	num = pscene->act_num;
+	for (id = 0; id < num; id++)
+	{
+		paction = &pscene->actions[id];
+		xmlNodePtr action = xmlNewNode(NULL, BAD_CAST"action");
+
+		INT_TO_BUF((paction->has_cond ? 1 : 0), buf);
+		xmlNewProp(action, BAD_CAST"has_cond", BAD_CAST buf);
+
+		INT_TO_BUF(paction->delay, buf);
+		xmlNewProp(action, BAD_CAST"delay", BAD_CAST buf);
+
+		INT_TO_BUF(paction->act_num, buf);
+		xmlNewProp(action, BAD_CAST"act_num", BAD_CAST buf);
+
+		if (paction->has_cond) {
+			HSB_SCENE_CONDITION_T *pcond = &paction->condition;
+			xmlNodePtr cond = xmlNewNode(NULL, BAD_CAST"condition");
+			
+			INT_TO_BUF(pcond->devid, buf);
+			_add_node(cond, "devid", buf);
+
+			INT_TO_BUF(pcond->id, buf);
+			_add_node(cond, "id", buf);
+
+			INT_TO_BUF(pcond->val, buf);
+			_add_node(cond, "val", buf);
+
+			INT_TO_BUF(pcond->expr, buf);
+			_add_node(cond, "expr", buf);
+
+			xmlAddChild(action, cond);
+		}
+
+		int cnt;
+		HSB_SCENE_ACT_T *pact = NULL;
+		for (cnt = 0; cnt < paction->act_num; cnt++)
+		{
+			pact = &paction->acts[cnt];
+			xmlNodePtr act = xmlNewNode(NULL, BAD_CAST"act");
+
+			
+			INT_TO_BUF(pact->flag, buf);
+			_add_node(act, "flag", buf);
+
+			INT_TO_BUF(pact->devid, buf);
+			_add_node(act, "devid", buf);
+
+			INT_TO_BUF(pact->id, buf);
+			_add_node(act, "id", buf);
+
+			INT_TO_BUF(pact->param1, buf);
+			_add_node(act, "param1", buf);
+
+			INT_TO_BUF(pact->param2, buf);
+			_add_node(act, "param2", buf);
+
+			xmlAddChild(action, act);
+		}
+
+		xmlAddChild(node, action);
+	}
+
+	return HSB_E_OK;
+}
+
+int save_config(void)
+{
+	int ret;
 	xmlDocPtr doc;
 	xmlNodePtr root, node;
 
@@ -149,6 +308,21 @@ static int save_config(void)
 		xmlAddChild(root, node);
 	}
 
+	/* add scene */
+	uint32_t num;
+	HSB_SCENE_T *pscene = NULL;
+	get_scene_num(&num);
+	for (id = 0; id < num; id++)
+	{
+		ret = get_scene(id, &pscene);
+		if (HSB_E_OK != ret)
+			continue;
+
+		node = make_scene_node(pscene);
+
+		xmlAddChild(root, node);
+	}
+
 	char file[128];
 	snprintf(file, sizeof(file), HSB_CONFIG_DIR"%s", HSB_CONFIG_FILE);
 
@@ -196,6 +370,14 @@ static int parse_dev(xmlNodePtr node, HSB_DEV_T **ppdev)
 
 			pdev->info.dev_type = atoi(key);
 			
+		} else if (0 == xmlStrcmp(cur->name, BAD_CAST"drvid")) {
+			if (!key) {
+				hsb_critical("parse fail: drvid not found\n");
+				goto fail;
+			}
+
+			pdev->drvid = atoi(key);
+
 		} else if (0 == xmlStrcmp(cur->name, BAD_CAST"mac")) {
 			if (!key) {
 				hsb_critical("parse fail: mac not found\n");
@@ -218,6 +400,88 @@ static int parse_dev(xmlNodePtr node, HSB_DEV_T **ppdev)
 			}
 
 			strncpy(pdev->config.location, key, sizeof(pdev->config.location));
+		} else if (0 == xmlStrcmp(cur->name, BAD_CAST"channel")) {
+			xmlNodePtr chan = cur->xmlChildrenNode;
+			xmlChar *pbuf;
+			uint8_t cname[64];
+			uint32_t cid;
+			uint8_t flag = 0;
+
+			while (chan) {
+				pbuf = xmlNodeGetContent(chan->xmlChildrenNode);
+
+				if (0 == xmlStrcmp(chan->name, BAD_CAST"cname")) {
+					strcpy(cname, pbuf);
+					flag |= (1 << 0);
+				} else if (0 == xmlStrcmp(chan->name, BAD_CAST"cid")) {
+					cid = atoi(pbuf);
+					flag |= (1 << 1);
+				}
+
+				if (pbuf)
+					xmlFree(pbuf);
+
+				chan = chan->next;
+			}
+
+			if (flag == 0x03) {
+				if (!pdev->pchan_db)
+					pdev->pchan_db = alloc_channel_db();
+
+				HSB_CHANNEL_DB_T *pchan = pdev->pchan_db;
+
+				set_channel(pchan, cname, cid);
+			}
+		} else if (0 == xmlStrcmp(cur->name, BAD_CAST"timer")) {
+			xmlNodePtr timer = cur->xmlChildrenNode;
+			xmlChar *pbuf;
+			HSB_TIMER_T *ptimer = NULL;
+			HSB_TIMER_STATUS_T *pstatus = NULL;
+			int id;
+
+			pbuf = xmlGetProp(cur, "id");
+			if (pbuf && (id = atoi(pbuf)) < HSB_DEV_MAX_TIMER_NUM)
+			{
+				xmlFree(pbuf);
+				ptimer = &pdev->timer[id];
+				pstatus = &pdev->timer_status[id];
+
+				pstatus->active = true;
+				while (timer) {
+					pbuf = xmlNodeGetContent(timer->xmlChildrenNode);
+
+					if (0 == xmlStrcmp(timer->name, BAD_CAST"work_mode")) {
+						ptimer->work_mode = atoi(pbuf);
+					}else if (0 == xmlStrcmp(timer->name, BAD_CAST"flag")) {
+						ptimer->flag = atoi(pbuf);
+					}else if (0 == xmlStrcmp(timer->name, BAD_CAST"year")) {
+						ptimer->year = atoi(pbuf);
+					}else if (0 == xmlStrcmp(timer->name, BAD_CAST"mon")) {
+						ptimer->mon = atoi(pbuf);
+					}else if (0 == xmlStrcmp(timer->name, BAD_CAST"mday")) {
+						ptimer->mday = atoi(pbuf);
+					}else if (0 == xmlStrcmp(timer->name, BAD_CAST"hour")) {
+						ptimer->hour = atoi(pbuf);
+					}else if (0 == xmlStrcmp(timer->name, BAD_CAST"min")) {
+						ptimer->min = atoi(pbuf);
+					}else if (0 == xmlStrcmp(timer->name, BAD_CAST"sec")) {
+						ptimer->sec = atoi(pbuf);
+					}else if (0 == xmlStrcmp(timer->name, BAD_CAST"wday")) {
+						ptimer->wday = atoi(pbuf);
+					}else if (0 == xmlStrcmp(timer->name, BAD_CAST"act_id")) {
+						ptimer->act_id = atoi(pbuf);
+					}else if (0 == xmlStrcmp(timer->name, BAD_CAST"act_param1")) {
+						ptimer->act_param1 = atoi(pbuf);
+					}else if (0 == xmlStrcmp(timer->name, BAD_CAST"act_param2")) {
+						ptimer->act_param2 = atoi(pbuf);
+					}
+
+					if (pbuf)
+						xmlFree(pbuf);
+
+					timer = timer->next;
+				}
+			}
 		}
 
 		if (key)
@@ -228,13 +492,8 @@ static int parse_dev(xmlNodePtr node, HSB_DEV_T **ppdev)
 
 	*ppdev = pdev;
 
-	if (pdev->info.dev_type > 2) { // TODO
-		hsb_debug("add a device [%d] to devq\n", devid);
-		g_queue_push_tail(devq, pdev);
-	} else {
-		hsb_debug("add a device [%d] to offq\n", devid);
-		g_queue_push_tail(offq, pdev);
-	}
+	hsb_debug("add a device [%d] to offq\n", devid);
+	g_queue_push_tail(offq, pdev);
 
 	return HSB_E_OK;
 fail:
@@ -246,12 +505,116 @@ fail:
 	return HSB_E_OTHERS;
 }
 
+static int parse_scene(xmlNodePtr node)
+{
+	xmlNodePtr cur;
+	xmlChar *key;
+
+	HSB_SCENE_T *pscene = alloc_scene();
+	if (!pscene)
+		return HSB_E_NO_MEMORY;
+
+	key = xmlGetProp(node, "act_num");
+	pscene->act_num = atoi(key);
+	xmlFree(key);
+	
+	key = xmlGetProp(node, "name");
+	strcpy(pscene->name, key);
+	xmlFree(key);
+	
+	cur = node->xmlChildrenNode;
+	int id = 0;
+	while (cur) {
+
+		if (0 == xmlStrcmp(cur->name, BAD_CAST"action")) {
+			HSB_SCENE_ACTION_T *paction = &pscene->actions[id];
+
+			key = xmlGetProp(cur, "has_cond");
+			paction->has_cond = atoi(key) > 0 ? true : false;
+			xmlFree(key);
+
+			key = xmlGetProp(cur, "delay");
+			paction->delay = atoi(key);
+			xmlFree(key);
+
+			key = xmlGetProp(cur, "act_num");
+			paction->act_num = atoi(key);
+			xmlFree(key);
+
+			xmlNodePtr child = cur->xmlChildrenNode;
+			int act_id = 0;
+			while (child) {
+				if (0 == xmlStrcmp(child->name, BAD_CAST"act")) {
+					HSB_SCENE_ACT_T *pact = &paction->acts[act_id];
+
+					xmlNodePtr act = child->xmlChildrenNode;
+
+					while (act) {
+						key = xmlNodeGetContent(act->xmlChildrenNode);
+
+						if (0 == xmlStrcmp(act->name, BAD_CAST"flag")) {
+							pact->flag = atoi(key);
+						} else if (0 == xmlStrcmp(act->name, BAD_CAST"devid")) {
+							pact->devid = atoi(key);
+						} else if (0 == xmlStrcmp(act->name, BAD_CAST"id")) {
+							pact->id = atoi(key);
+						} else if (0 == xmlStrcmp(act->name, BAD_CAST"param1")) {
+							pact->param1 = atoi(key);
+						} else if (0 == xmlStrcmp(act->name, BAD_CAST"param2")) {
+							pact->param2 = atoi(key);
+						}
+
+						if (key)
+							xmlFree(key);
+
+						act = act->next;
+					}
+
+					act_id++;
+				} else if (0 == xmlStrcmp(child->name, BAD_CAST"condition")) {
+					HSB_SCENE_CONDITION_T *pcond = &paction->condition;
+
+					xmlNodePtr cond = child->xmlChildrenNode;
+
+					while (cond) {
+						key = xmlNodeGetContent(cond->xmlChildrenNode);
+
+						if (0 == xmlStrcmp(cond->name, BAD_CAST"devid")) {
+							pcond->devid = atoi(key);
+						} else if (0 == xmlStrcmp(cond->name, BAD_CAST"id")) {
+							pcond->id = atoi(key); 
+						} else if (0 == xmlStrcmp(cond->name, BAD_CAST"val")) {
+							pcond->val = atoi(key); 
+						} else if (0 == xmlStrcmp(cond->name, BAD_CAST"expr")) {
+							pcond->expr = atoi(key); 
+						}
+
+						if (key)
+							xmlFree(key);
+
+						cond = cond->next;
+					}
+				}
+
+				child = child->next;
+			}
+
+			id++;
+		}
+
+		cur = cur->next;
+	}
+
+	return HSB_E_OK;
+}
+
 static int load_config(void)
 {
 	xmlDocPtr doc;
 	xmlNodePtr cur;
 	HSB_DEV_T *pdev = NULL;
 	int ret;
+	uint32_t max_devid = 1;
 
 	char file[128];
 	snprintf(file, sizeof(file), HSB_CONFIG_DIR"%s", HSB_CONFIG_FILE);
@@ -275,12 +638,22 @@ static int load_config(void)
 			ret = parse_dev(cur, &pdev);
 			if (ret != HSB_E_OK)
 				hsb_critical("parse dev fail, ret=%d\n", ret);
+			else {
+				if (pdev->id >= max_devid)
+					max_devid = pdev->id + 1; 
+			}
+		} else if (0 == xmlStrcmp(cur->name, (const xmlChar *)"scene")) {
+			ret = parse_scene(cur);
+			if (ret != HSB_E_OK)
+				hsb_critical("parse scene fail, ret=%d\n", ret);
 		}
 
 		cur = cur->next;
 	}
 
 	xmlFreeDoc(doc);
+
+	gl_dev_cb.dev_id = max_devid;
 
 	return HSB_E_OK;
 }
@@ -474,43 +847,49 @@ int set_dev_cfg(uint32_t dev_id, const HSB_DEV_CONFIG_T *cfg)
 	link_device(pdev);
 	update_link(pdev);
 
+	save_config();
+
 	return HSB_E_OK;
 }
 
 int set_dev_channel(uint32_t devid, char *name, uint32_t cid)
 {
+	int ret;
 	HSB_DEV_T *pdev = find_dev(devid);
 
 	if (!pdev)
 		return HSB_E_BAD_PARAM;
 
-	HSB_CHANNEL_DB_T *pdb = NULL;
-
-	if (pdev->op && pdev->op->get_channel_db)
-		pdev->op->get_channel_db(pdev, &pdb);
+	HSB_CHANNEL_DB_T *pdb = pdev->pchan_db;
 
 	if (!pdb)
 		return HSB_E_NOT_SUPPORTED;
 
-	return set_channel(pdb, name, cid);
+	ret = set_channel(pdb, name, cid);
+
+	save_config();
+
+	return ret;
 }
 
 int del_dev_channel(uint32_t devid, char *name)
 {
+	int ret;
 	HSB_DEV_T *pdev = find_dev(devid);
 
 	if (!pdev)
 		return HSB_E_BAD_PARAM;
 
-	HSB_CHANNEL_DB_T *pdb = NULL;
-
-	if (pdev->op && pdev->op->get_channel_db)
-		pdev->op->get_channel_db(pdev, &pdb);
+	HSB_CHANNEL_DB_T *pdb = pdev->pchan_db;
 
 	if (!pdb)
 		return HSB_E_NOT_SUPPORTED;
 
-	return del_channel(pdb, name);
+	ret = del_channel(pdb, name);
+
+	save_config();
+
+	return ret;
 }
 
 int get_dev_channel(uint32_t devid, char *name, uint32_t *cid)
@@ -520,10 +899,7 @@ int get_dev_channel(uint32_t devid, char *name, uint32_t *cid)
 	if (!pdev)
 		return HSB_E_BAD_PARAM;
 
-	HSB_CHANNEL_DB_T *pdb = NULL;
-
-	if (pdev->op && pdev->op->get_channel_db)
-		pdev->op->get_channel_db(pdev, &pdb);
+	HSB_CHANNEL_DB_T *pdb = pdev->pchan_db;
 
 	if (!pdb)
 		return HSB_E_NOT_SUPPORTED;
@@ -538,10 +914,7 @@ int get_dev_channel_num(uint32_t devid, int *num)
 	if (!pdev)
 		return HSB_E_BAD_PARAM;
 
-	HSB_CHANNEL_DB_T *pdb = NULL;
-
-	if (pdev->op && pdev->op->get_channel_db)
-		pdev->op->get_channel_db(pdev, &pdb);
+	HSB_CHANNEL_DB_T *pdb = pdev->pchan_db;
 
 	if (!pdb)
 		return HSB_E_NOT_SUPPORTED;
@@ -556,14 +929,10 @@ int get_dev_channel_by_id(uint32_t devid, int id, char *name, uint32_t *cid)
 	if (!pdev)
 		return HSB_E_BAD_PARAM;
 
-	HSB_CHANNEL_DB_T *pdb = NULL;
-
-	if (pdev->op && pdev->op->get_channel_db)
-		pdev->op->get_channel_db(pdev, &pdb);
+	HSB_CHANNEL_DB_T *pdb = pdev->pchan_db;
 
 	if (!pdb)
 		return HSB_E_NOT_SUPPORTED;
-
 
 	return get_channel_by_id(pdb, id, name, cid);
 }
@@ -916,6 +1285,42 @@ int remove_dev(HSB_DEV_T *dev)
 	return 0;
 }
 
+static int recover_dev(void)
+{
+	int ret;
+	guint id;
+	GQueue *queue = &gl_dev_cb.offq;
+	HSB_DEV_T	*pdev = NULL;
+	HSB_DEV_DRV_T	*drv = NULL;
+
+	id = 0;
+	while (id < g_queue_get_length(queue))
+	{
+		pdev = (HSB_DEV_T *)g_queue_peek_nth(queue, id);
+		if (!pdev) {
+			hsb_critical("device null\n");
+			continue;
+		}
+
+		drv = _find_drv(pdev->drvid);
+		if (!drv) {
+			hsb_critical("drv not found: %d\n", pdev->drvid);
+			continue;
+		}
+
+		ret = HSB_E_OTHERS;
+		if (drv->op && drv->op->recover_dev)
+			ret = drv->op->recover_dev(pdev->id, pdev->info.dev_type);
+
+		if (HSB_E_OK == ret)
+			continue;
+
+		id++;
+	}
+
+	return HSB_E_OK;
+}
+
 #include "hsb_const.h"
 
 static void get_default_config(uint32_t dev_type, HSB_DEV_CONFIG_T *config)
@@ -931,6 +1336,7 @@ int dev_online(uint32_t drvid,
 		HSB_DEV_STATUS_T *status,
 		HSB_DEV_OP_T *op,
 		HSB_DEV_CONFIG_T *cfg,
+		bool support_channel,
 		void *priv,
 		uint32_t *devid)
 {
@@ -950,7 +1356,8 @@ int dev_online(uint32_t drvid,
 			continue;
 		}
 
-		if (0 == memcmp(pdev->info.mac, info->mac, 8)) {
+		if (drvid == pdev->drvid &&
+		    0 == memcmp(pdev->info.mac, info->mac, 8)) {
 			break;
 		}
 	}
@@ -959,6 +1366,9 @@ int dev_online(uint32_t drvid,
 
 	if (id == len) { /* not found in offq */
 		pdev = create_dev();
+		if (support_channel)
+			pdev->pchan_db = alloc_channel_db();
+		pdev->drvid = drvid;
 		pdev->driver = _find_drv(drvid);
 		pdev->op = op;
 		pdev->priv_data = priv;
@@ -991,6 +1401,9 @@ int dev_online(uint32_t drvid,
 	} else {
 		g_queue_pop_nth(offq, id);
 
+		if (support_channel && !pdev->pchan_db)
+			pdev->pchan_db = alloc_channel_db();
+		pdev->drvid = drvid;
 		pdev->driver = _find_drv(drvid);
 		pdev->op = op;
 		pdev->priv_data = priv;
@@ -998,8 +1411,6 @@ int dev_online(uint32_t drvid,
 
 		memcpy(&pdev->info, info, sizeof(*info));
 		memcpy(&pdev->status, status, sizeof(*status));
-
-		pdev->state = HSB_DEV_STATE_ONLINE;
 
 		HSB_DEVICE_CB_LOCK();
 		g_queue_push_tail(queue, pdev);
@@ -1101,6 +1512,71 @@ int dev_removed(uint32_t devid)
 	destroy_dev(pdev);
 
 	return ret;
+}
+
+int dev_recovered(uint32_t devid,
+		uint32_t drvid,
+		HSB_DEV_INFO_T *info,
+		HSB_DEV_STATUS_T *status,
+		HSB_DEV_OP_T *op,
+		bool support_channel,
+		void *priv)
+{
+	int ret = HSB_E_OK;
+	GQueue *offq = &gl_dev_cb.offq;
+	GQueue *queue = &gl_dev_cb.queue;
+	HSB_DEV_T *pdev = NULL;
+	guint len, id;
+
+	HSB_DEVICE_CB_LOCK();
+
+	len = g_queue_get_length(offq);
+	for (id = 0; id < len; id++) {
+		pdev = (HSB_DEV_T *)g_queue_peek_nth(offq, id);
+		if (!pdev) {
+			hsb_critical("device null\n");
+			continue;
+		}
+
+		if (devid == pdev->id) {
+			break;
+		}
+	}
+
+	HSB_DEVICE_CB_UNLOCK();
+
+	if (id == len) { /* not found in offq */
+		hsb_critical("not found in offq!\n");
+		return HSB_E_OTHERS;
+	}
+
+	g_queue_pop_nth(offq, id);
+
+	if (support_channel && !pdev->pchan_db)
+		pdev->pchan_db = alloc_channel_db();
+	pdev->drvid = drvid;
+	pdev->driver = _find_drv(drvid);
+	pdev->op = op;
+	pdev->priv_data = priv;
+	pdev->state = HSB_DEV_STATE_ONLINE;
+
+	memcpy(&pdev->info, info, sizeof(*info));
+	memcpy(&pdev->status, status, sizeof(*status));
+
+	HSB_DEVICE_CB_LOCK();
+	g_queue_push_tail(queue, pdev);
+	HSB_DEVICE_CB_UNLOCK();
+
+	link_device(pdev);
+	update_link(pdev);
+
+	dev_updated(pdev->id, HSB_DEV_UPDATED_TYPE_ONLINE, pdev->info.dev_type);
+
+	hsb_debug("device recoverd %d\n", pdev->id);
+
+	return ret;
+
+
 }
 
 static int check_linkage(uint32_t devid, HSB_EVT_T *evt)
@@ -1468,6 +1944,8 @@ int init_dev_module(void)
 	init_cz_drv();
 	init_ir_drv();
 
+	recover_dev();
+
 	probe_all_devices();
 
 	return 0;
@@ -1525,6 +2003,8 @@ int set_dev_timer(uint32_t dev_id, const HSB_TIMER_T *timer)
 	status->active = true;
 	status->expired = false;
 
+	save_config();
+
 _out:
 	return ret;
 }
@@ -1551,6 +2031,8 @@ int del_dev_timer(uint32_t dev_id, uint16_t timer_id)
 
 	memset(tm, 0, sizeof(*tm));
 	memset(status, 0, sizeof(*status));
+
+	save_config();
 
 _out:
 	return ret;

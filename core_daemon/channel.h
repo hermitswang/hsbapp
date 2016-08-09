@@ -16,11 +16,11 @@ typedef struct {
 	GMutex	mutex;
 } HSB_CHANNEL_DB_T;
 
-int init_channel(HSB_CHANNEL_DB_T *db);
+HSB_CHANNEL_DB_T *alloc_channel_db(void);
+int release_channel_db(HSB_CHANNEL_DB_T *pdb);
 int set_channel(HSB_CHANNEL_DB_T *db, char *name, uint32_t cid);
 int del_channel(HSB_CHANNEL_DB_T *db, char *name);
 int get_channel(HSB_CHANNEL_DB_T *db, char *name, uint32_t *cid);
-
 
 int get_channel_num(HSB_CHANNEL_DB_T *db, int *num);
 int get_channel_by_id(HSB_CHANNEL_DB_T *db, int id, char *name, uint32_t *cid);

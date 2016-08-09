@@ -348,6 +348,8 @@ static HSB_DEV_OP_T virtual_switch_op = {
 static HSB_DEV_DRV_OP_T virtual_switch_drv_op = {
 	virtual_switch_probe,
 	NULL,
+	NULL,
+	NULL,
 };
 
 static HSB_DEV_DRV_T virtual_switch_drv = {
@@ -410,7 +412,14 @@ static int _register_device(struct in_addr *addr, VS_INFO_T *info)
 	dev_info.dev_type = info->dev_type;
 	memcpy(dev_info.mac, info->mac, 6);
 
-	int ret = dev_online(virtual_switch_drv.id, &dev_info, &status, &virtual_switch_op, NULL, NULL, &devid);
+	int ret = dev_online(virtual_switch_drv.id,
+				&dev_info,
+				&status,
+				&virtual_switch_op,
+				NULL,
+				false,
+				NULL,
+				&devid);
 	if (HSB_E_OK != ret)
 		return ret;
 

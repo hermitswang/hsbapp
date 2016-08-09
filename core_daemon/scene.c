@@ -77,6 +77,8 @@ int add_scene(HSB_SCENE_T *scene)
 
 	g_queue_push_tail(queue, scene);
 
+	save_config();
+
 	return HSB_E_OK;
 }
 
@@ -90,6 +92,8 @@ int del_scene(char *name)
 	g_queue_remove(queue, scene);
 
 	free_scene(scene);
+
+	save_config();
 
 	return HSB_E_OK;
 }

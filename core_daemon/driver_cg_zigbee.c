@@ -167,7 +167,7 @@ static int _register_device(uint16_t short_addr, uint16_t end_point, CZ_INFO_T *
 	dev_info.dev_type = info->dev_type;
 	memcpy(dev_info.mac, info->mac, 8);
 	
-	int ret = dev_online(cz_drv.id, &dev_info, &status, &sample_op, NULL, NULL, &devid);
+	int ret = dev_online(cz_drv.id, &dev_info, &status, &sample_op, NULL, false, NULL, &devid);
 	if (HSB_E_OK != ret)
 		return ret;
 
@@ -487,6 +487,8 @@ static HSB_DEV_OP_T sample_op = {
 
 static HSB_DEV_DRV_OP_T cz_drv_op = {
 	cz_probe,
+	NULL,
+	NULL,
 	NULL,
 };
 

@@ -73,21 +73,13 @@ static int cc9201_key_press(HSB_DEV_T *ir_dev, HSB_TV_ACTION_T action)
 
 static int cc9201_init(void **priv)
 {
-	HSB_CHANNEL_DB_T *pdb = g_slice_new0(HSB_CHANNEL_DB_T);
-	if (!pdb)
-		return HSB_E_NO_MEMORY;
-	
-	init_channel(pdb);
-
-	*priv = pdb;
+	*priv = NULL;
 
 	return HSB_E_OK;
 }
 
 static int cc9201_release(void *priv)
 {
-	g_slice_free(HSB_CHANNEL_DB_T, priv);
-
 	return HSB_E_OK;
 }
 
@@ -183,7 +175,6 @@ static HSB_DEV_OP_T cc9201_op = {
 	cc9201_set_action,
 	cc9201_init,
 	cc9201_release,
-	cc9201_get_channel_db,
 };
 
 typedef enum {
@@ -302,11 +293,11 @@ static HSB_DEV_OP_T gree_op = {
 	NULL,
 	NULL,
 	NULL,
-	NULL,
 };
 
 static int ir_add_dev(HSB_DEV_TYPE_T ir_type, HSB_DEV_CONFIG_T *cfg)
 {
+	bool support_channel = false;
 	uint32_t devid;
 	HSB_DEV_INFO_T dev_info = { 0 };
 	dev_info.interface = HSB_INTERFACE_IR;
@@ -324,6 +315,8 @@ static int ir_add_dev(HSB_DEV_TYPE_T ir_type, HSB_DEV_CONFIG_T *cfg)
 			status.val[0] = 0;
 
 			op = &cc9201_op;
+
+			support_channel = true;
 			break;
 		case HSB_DEV_TYPE_GREE_AC:
 			dev_info.cls = HSB_DEV_CLASS_AIR_CONDITIONER;
@@ -352,11 +345,7 @@ static int ir_add_dev(HSB_DEV_TYPE_T ir_type, HSB_DEV_CONFIG_T *cfg)
 			return ret;
 	}
 
-	ret = dev_online(ir_drv.id, &dev_info, &status, op, cfg, priv, &devid);
-	if (HSB_E_OK != ret)
-		return ret;
-
-	return HSB_E_OK;
+	return dev_online(ir_drv.id, &dev_info, &status, op, cfg, support_channel, priv, &devid);
 }
 
 static int ir_del_dev(uint32_t devid)
@@ -380,12 +369,63 @@ static int ir_del_dev(uint32_t devid)
 	return dev_removed(devid);
 }
 
+static int ir_recover_dev(uint32_t devid, uint32_t type)
+{
+	bool support_channel = false;
+	HSB_DEV_INFO_T dev_info = { 0 };
+	dev_info.interface = HSB_INTERFACE_IR;
+	dev_info.dev_type = type;
 
+	HSB_DEV_STATUS_T status = { 0 };
+
+	HSB_DEV_OP_T *op = NULL;
+	// ir_type to dev op
+	switch (type) {
+		case HSB_DEV_TYPE_CC9201:
+			dev_info.cls = HSB_DEV_CLASS_STB;
+
+			status.num = 1;
+			status.val[0] = 0;
+
+			op = &cc9201_op;
+
+			support_channel = true;
+			break;
+		case HSB_DEV_TYPE_GREE_AC:
+			dev_info.cls = HSB_DEV_CLASS_AIR_CONDITIONER;
+
+			status.num = 5;
+			status.val[GREE_STATUS_ID_WORK_MODE] = 0;
+			status.val[GREE_STATUS_ID_POWER] = 0;
+			status.val[GREE_STATUS_ID_WIND_SPEED] = 0;
+			status.val[GREE_STATUS_ID_TEMPERATURE] = 25;
+			status.val[GREE_STATUS_ID_LIGHT] = 1;
+
+			op = &gree_op;
+			break;
+		default:
+			break;
+	}
+
+	if (!op)
+		return HSB_E_NOT_SUPPORTED;
+
+	void *priv = NULL;
+	int ret;
+	if (op->init) {
+		ret = op->init(&priv);
+		if (ret != HSB_E_OK)
+			return ret;
+	}
+
+	return dev_recovered(devid, ir_drv.id, &dev_info, &status, op, support_channel, priv);
+}
 
 static HSB_DEV_DRV_OP_T ir_drv_op = {
 	NULL,
 	ir_add_dev,
 	ir_del_dev,
+	ir_recover_dev,
 };
 
 static HSB_DEV_DRV_T ir_drv = {
