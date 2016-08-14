@@ -22,7 +22,7 @@
 #define LINUX_ETH_INTERFACE	"eth0"
 #define ANDROID_ETH_INTERFACE	"wlan0"
 
-#define MAX_TCP_CLIENT_NUM	(5)
+#define MAX_TCP_CLIENT_NUM	(10)
 
 #define MAXLINE 1024UL
 #define MAXPATH 256UL

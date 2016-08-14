@@ -341,7 +341,7 @@ static int _get_dev_status(uint8_t *buf, int len, HSB_STATUS_T *status)
 	for (id = 0; id < total; id++) {
 		status->id[id] = GET_CMD_FIELD(buf, 8 + id * 4, uint16_t);
 		status->val[id] = GET_CMD_FIELD(buf, 10 + id * 4, uint16_t);
-		hsb_debug("_get_dev_status: %d=%d\n", status->id[id], status->val[id]);
+		//hsb_debug("_get_dev_status: %d=%d\n", status->id[id], status->val[id]);
 	}
 
 	status->num = total;
@@ -1162,6 +1162,7 @@ static void *tcp_listen_thread(void *arg)
 		hsb_debug("get a client\n");
 		pctx = get_client_context(sockfd);
 		if (!pctx) {
+			hsb_critical("can't get client context\n");
 			close(sockfd);
 			continue;
 		}
@@ -1248,6 +1249,7 @@ static void tcp_client_handler(gpointer data, gpointer user_data)
 	close(sockfd);
 
 	put_client_context(pctx);
+	hsb_debug("put a client\n");
 }
 
 #define NOTIFY_MESSAGE	"notify"
