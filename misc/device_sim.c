@@ -231,22 +231,50 @@ static int deal_udp_pkt(int fd, uint8_t *buf, size_t count, struct sockaddr *cli
 
 static int deal_input_cmd(int sockfd, uint8_t *buf, struct sockaddr_in *addr)
 {
-	uint32_t val = 0;
+	uint32_t val = 0, val2 = 0;
 	uint8_t rbuf[16];
 	int rlen = 0;
 	memset(rbuf, 0, sizeof(rbuf));
 
-	if (1 == sscanf(buf, "status=%d", &val)) {
-		if (status_on_off == val)
-			return 0;
+	if (1 == sscanf(buf, "status %d %d", &val, val2)) {
+		switch (dev_type) {
+			case 0: // plug device
+			{
+				if (val != 0)
+					return 0;
+				if (status_on_off == val2)
+					return 0;
 
-		status_on_off = val;
+				status_on_off = val2;
+				break;
+			}
+
+			case 1: // sensor
+			{
+				if (val == 0) {
+					status_pm25 = val2;
+				} else if (val == 1) {
+					status_temp = val2;
+				} else if (val == 2) {
+					status_humi = val2;
+				} else if (val == 3) {
+					status_gas = val2;
+				} else
+					return 0;
+
+				break;
+			}
+			case 2: // remote control
+			default:
+				return 0;
+				break;
+		}
 
 		rlen = 8;
 		SET_CMD_FIELD(rbuf, 0, uint16_t, VS_CMD_STATUS_CHANGED);
 		SET_CMD_FIELD(rbuf, 2, uint16_t, rlen);
-		SET_CMD_FIELD(rbuf, 4, uint16_t, 0);
-		SET_CMD_FIELD(rbuf, 6, uint16_t, val);
+		SET_CMD_FIELD(rbuf, 4, uint16_t, val);
+		SET_CMD_FIELD(rbuf, 6, uint16_t, val2);
 
 	} else if (1 == sscanf(buf, "sensor=%d", &val)) {
 		rlen = 8;
