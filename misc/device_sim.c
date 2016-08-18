@@ -236,7 +236,7 @@ static int deal_input_cmd(int sockfd, uint8_t *buf, struct sockaddr_in *addr)
 	int rlen = 0;
 	memset(rbuf, 0, sizeof(rbuf));
 
-	if (1 == sscanf(buf, "status %d %d", &val, val2)) {
+	if (2 == sscanf(buf, "status %d %d", &val, &val2)) {
 		switch (dev_type) {
 			case 0: // plug device
 			{
