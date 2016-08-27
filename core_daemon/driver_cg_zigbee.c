@@ -698,8 +698,6 @@ int deal_recv_buf(uint8_t *buf, int len)
 	return HSB_E_OK;
 }
 
-#define SERIAL_INTERFACE	"/dev/ttyUSB0"
-
 static void *_monitor_thread(void *arg)
 {
 	HSB_DEVICE_DRIVER_CONTEXT_T *pctx = &gl_ctx;
@@ -798,9 +796,15 @@ int init_cz_drv(void)
 	pthread_cond_init(&pctx->condition, NULL);
 	pthread_mutex_init(&pctx->cond_mutex, NULL);
 
-	int fd = open_serial_fd(SERIAL_INTERFACE, 115200);
+	const char *uart = get_uart_interface();
+	if (!uart) {
+		hsb_critical("get uart failed\n");
+		return HSB_E_OTHERS;
+	}
+
+	int fd = open_serial_fd(uart, 115200);
 	if (fd < 0) {
-		hsb_critical("open %s failed\n", SERIAL_INTERFACE);
+		hsb_critical("open %s failed\n", uart);
 		return HSB_E_OTHERS;
 	}
 

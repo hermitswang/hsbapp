@@ -384,6 +384,29 @@ const char *get_eth_interface(void)
 
 }
 
+const char *get_uart_interface(void)
+{
+	const char *intf1 = "/dev/ttyUSB0";
+	const char *intf2 = "/dev/ttyS3";
+
+	if (0 == access(intf1, F_OK))
+		return intf1;
+	else if (0 == access(intf2, F_OK))
+		return intf2;
+
+	return NULL;
+}
+
+void get_config_file(char *path)
+{
+	if (is_android())
+	{
+		sprintf(path, ANDROID_CONFIG_DIR"%s", HSB_CONFIG_FILE);
+	} else {
+		sprintf(path, LINUX_CONFIG_DIR"%s", HSB_CONFIG_FILE);
+	}
+}
+
 int str_to_mac(char *buf, uint8_t *pmac)
 {
 	if (!buf || !pmac)

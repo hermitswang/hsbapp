@@ -324,7 +324,7 @@ int save_config(void)
 	}
 
 	char file[128];
-	snprintf(file, sizeof(file), HSB_CONFIG_DIR"%s", HSB_CONFIG_FILE);
+	get_config_file(file);
 
 	xmlSaveFormatFileEnc(file, doc, "UTF-8", 1);
 
@@ -620,7 +620,7 @@ static int load_config(void)
 	uint32_t max_devid = 1;
 
 	char file[128];
-	snprintf(file, sizeof(file), HSB_CONFIG_DIR"%s", HSB_CONFIG_FILE);
+	get_config_file(file);
 
 	doc = xmlParseFile(file);
 	if (!doc) {

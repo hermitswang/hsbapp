@@ -36,6 +36,8 @@ uint64_t get_msec(void);
 bool is_android(void);
 const char *get_work_dir(void);
 const char *get_eth_interface(void);
+const char *get_uart_interface(void);
+void get_config_file(char *path);
 
 int str_to_mac(char *buf, uint8_t *pmac);
 int mac_to_str(uint8_t *mac, char *buf);
