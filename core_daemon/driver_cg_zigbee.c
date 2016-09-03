@@ -307,6 +307,8 @@ static int sample_set_status(const HSB_STATUS_T *status)
 	pctx->trans_id++;
 	COND_UNLOCK();
 
+	dev_status_updated(pstat->devid, pstat);
+
 	return HSB_E_OK;
 fail:
 	pctx->is_waiting = FALSE;

@@ -5,7 +5,7 @@ OBJS=${SRC:%.c=%.o}
 NAME=${SRC:%.c=%}
 DEPS=$(SRC:%.c=.dep/*.d)
 CFLAGS+= `pkg-config --cflags libxml-2.0`
-LDFLAGS+= `pkg-config --libs libxml-2.0`
+LDFLAGS+= `pkg-config --libs libxml-2.0` # -lm -lz -llzma -static
 
 ${TARGET}:  ${OBJS} $(HSB_LIBS)
 	${CC}  -o $@ ${OBJS} ${LDFLAGS}
