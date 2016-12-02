@@ -1,5 +1,5 @@
 
-TARGET=un_send device_sim pad_sim smart_config udp_listen zigbee_sim unix_send # switch_probe
+TARGET=un_send device_sim pad_sim smart_config udp_listen zigbee_sim unix_send serial_send # switch_probe
 
 SRC=$(wildcard *.c)
 OBJS=${SRC:%.c=%.o}
@@ -29,6 +29,9 @@ zigbee_sim : zigbee_sim.o $(HSB_LIBS)
 	$(CC) -o $@ $< $(LDFLAGS)
 
 unix_send : unix_send.o $(HSB_LIBS)
+	$(CC) -o $@ $< $(LDFLAGS)
+
+serial_send: serial_send.o $(HSB_LIBS)
 	$(CC) -o $@ $< $(LDFLAGS)
 
 -include ${DEPS}
